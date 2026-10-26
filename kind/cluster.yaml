@@ -1,0 +1,14 @@
+# Local lab cluster for kubemedic.
+# One control plane + one worker keeps it close to a real cluster (scheduling,
+# node conditions) while staying light enough for a laptop.
+# Node image is pinned so scenario behaviour doesn't drift between runs.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: kubemedic
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.31.0
+  - role: worker
+    image: kindest/node:v1.31.0
+    labels:
+      kubemedic.io/pool: workloads

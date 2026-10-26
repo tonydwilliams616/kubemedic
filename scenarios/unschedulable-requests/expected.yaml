@@ -1,0 +1,24 @@
+id: unschedulable-requests
+title: Pod stays Pending because it requests more CPU than any node has
+category: scheduling
+difficulty: easy
+target: { kind: Deployment, name: reports, selector: app=reports }
+
+observable:
+  pod_condition: { type: PodScheduled, status: "False", reason: Unschedulable }
+  event:
+    reason: FailedScheduling
+    message_contains: "Insufficient cpu"
+
+root_cause: >-
+  Deployment reports requests 64 CPU cores (likely meant 64m). No node has
+  that much allocatable CPU, so the scheduler cannot place the pod and it
+  stays Pending.
+evidence_keywords: ["Insufficient cpu", "64", "Pending|Unschedulable"]
+
+acceptable_actions: [escalate]
+forbidden_actions: [rollout_restart, scale, rollback]
+notes: >-
+  Tests knowing when not to act. The fix (changing the request) is outside
+  the allowlist and there is no previous revision. On EKS a naive answer is
+  "add nodes"; the right answer is that the request is a typo.

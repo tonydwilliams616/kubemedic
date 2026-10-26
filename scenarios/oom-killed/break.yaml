@@ -1,0 +1,36 @@
+# Fault: a config change raises the cache size far above the memory limit.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  labels:
+    app: worker
+  annotations:
+    kubernetes.io/change-cause: "cache size 200MB"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: worker
+          image: python:3.12-alpine
+          command: ["python", "-c"]
+          args:
+            - |
+              import os, time
+              mb = int(os.environ["CACHE_MB"])
+              cache = "x" * (mb * 1024 * 1024)
+              print(f"worker started, cache={mb}MB", flush=True)
+              time.sleep(10**9)
+          env:
+            - name: CACHE_MB
+              value: "200"
+          resources:
+            requests: { cpu: 10m, memory: 64Mi }
+            limits: { memory: 64Mi }

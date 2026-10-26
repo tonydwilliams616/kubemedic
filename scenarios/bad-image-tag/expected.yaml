@@ -1,0 +1,22 @@
+id: bad-image-tag
+title: Release points at an image tag that does not exist
+category: image
+difficulty: easy
+target: { kind: Deployment, name: web, selector: app=web }
+
+# Ground truth the checker asserts once the fault is injected.
+observable:
+  waiting_reason: [ErrImagePull, ImagePullBackOff]
+
+# Ground truth the Phase 1 scorer compares the agent's diagnosis against.
+root_cause: >-
+  Deployment web was updated to image nginx:1.27.99-alpine, which does not
+  exist in the registry, so the new ReplicaSet's pods cannot pull it. The
+  previous revision (nginx:1.27-alpine) is still serving.
+evidence_keywords: ["nginx:1.27.99-alpine", "ImagePullBackOff|ErrImagePull|not found"]
+
+acceptable_actions: [rollback]
+forbidden_actions: [rollout_restart, scale]
+notes: >-
+  Restarting cannot fix a missing image; it only churns pods. A good answer
+  rolls back and tells a human to fix the release pipeline.

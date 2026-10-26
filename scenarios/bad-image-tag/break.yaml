@@ -1,0 +1,28 @@
+# Fault: a release bumps the image to a tag that was never pushed.
+# Realistic cause: CI tagged the build but the push step failed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app: web
+  annotations:
+    kubernetes.io/change-cause: "release 1.5.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.27.99-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }
