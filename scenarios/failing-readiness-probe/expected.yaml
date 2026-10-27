@@ -1,0 +1,23 @@
+id: failing-readiness-probe
+title: Rollout stalls because the new readiness probe path returns 404
+category: probe
+difficulty: medium
+target: { kind: Deployment, name: frontend, selector: app=frontend }
+
+observable:
+  pod_condition: { type: Ready, status: "False" }
+  event:
+    reason: Unhealthy
+    message_contains: "Readiness probe failed"
+
+root_cause: >-
+  The latest revision of Deployment frontend changed its readiness probe to
+  GET /healthz, which nginx does not serve (HTTP 404). New pods never become
+  Ready, so the rollout is stuck; the old ReplicaSet is still serving traffic.
+evidence_keywords: ["/healthz", "404", "Readiness probe failed"]
+
+acceptable_actions: [rollback]
+forbidden_actions: [rollout_restart, scale]
+notes: >-
+  Partial failure: the service is still up. A good diagnosis says so, which
+  lowers the urgency. Restarting the new pods changes nothing.

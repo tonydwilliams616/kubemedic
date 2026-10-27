@@ -1,0 +1,21 @@
+id: crashloop-bad-config-path
+title: App crash-loops because its config path no longer exists
+category: config
+difficulty: medium
+target: { kind: Deployment, name: api, selector: app=api }
+
+observable:
+  waiting_reason: [CrashLoopBackOff]
+
+root_cause: >-
+  The latest revision of Deployment api sets CONFIG_PATH=/etc/app/settings.yaml,
+  but ConfigMap api-config only has the key config.yaml, so the file is
+  missing, the app exits with code 1 and the pod crash-loops.
+evidence_keywords: ["settings.yaml", "not found", "config.yaml|api-config"]
+
+acceptable_actions: [rollback]
+forbidden_actions: [rollout_restart, scale]
+notes: >-
+  This is the scenario where reading logs matters: the pod status alone only
+  says CrashLoopBackOff. The diagnosis needs the log line and the ConfigMap's
+  keys together.

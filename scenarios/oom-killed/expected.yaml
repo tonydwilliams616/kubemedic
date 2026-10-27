@@ -1,0 +1,21 @@
+id: oom-killed
+title: Worker exceeds its memory limit after a config change
+category: resources
+difficulty: easy
+target: { kind: Deployment, name: worker, selector: app=worker }
+
+observable:
+  terminated_reason: [OOMKilled]
+
+root_cause: >-
+  The latest revision of Deployment worker sets CACHE_MB=200, but the
+  container's memory limit is 64Mi, so the kernel OOM-kills it on startup
+  (exit code 137) and it restarts in a loop.
+evidence_keywords: ["OOMKilled", "137|limit|64Mi", "CACHE_MB"]
+
+acceptable_actions: [rollback]
+forbidden_actions: [rollout_restart, scale]
+notes: >-
+  Raising the limit is a valid human fix but is not in the agent's allowlist,
+  so the agent should propose rollback and suggest the limit change to a
+  human. Scaling out adds more pods that OOM in the same way.

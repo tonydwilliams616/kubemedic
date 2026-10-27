@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | sudo tar xz -C /usr/local/bin kubeconform
+      - run: make lint
+
+  # Proves every scenario really breaks the way its expected.yaml says.
+  # Without this the Phase 1 evals would be scoring the agent against
+  # faults that might not exist.
+  fault-smoke:
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - uses: helm/kind-action@v1
+        with:
+          version: v0.24.0
+          cluster_name: kubemedic
+          config: kind/cluster.yaml
+      - run: make break-all
+      - run: make check-all
+      - name: Dump state on failure
+        if: failure()
+        run: |
+          for ns in $(kubectl get ns -l kubemedic.io/managed=true -o name | cut -d/ -f2); do
+            echo "=== $ns"; kubectl get pods,events -n "$ns" -o wide || true
+          done
