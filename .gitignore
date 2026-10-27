@@ -6,3 +6,4 @@ bin/
 reports/
 .env
 *.kubeconfig
+aws-login.sh
