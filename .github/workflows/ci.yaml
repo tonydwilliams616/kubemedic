@@ -1,3 +1,4 @@
+# CI: runs the lint and unit tests, then breaks every scenario on a throwaway kind cluster to prove each fault works.
 name: ci
 
 on:
@@ -41,8 +42,10 @@ jobs:
           version: v0.24.0
           cluster_name: kubemedic
           config: kind/cluster.yaml
+      - run: make agent-rbac
       - run: make break-all
       - run: make check-all
+      - run: make rbac-check
       - name: Dump state on failure
         if: failure()
         run: |

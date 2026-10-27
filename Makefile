@@ -1,10 +1,12 @@
+# Short commands (make break, make check, ...) that wrap the lab tool and kind.
+
 PYTHON   ?= python3
 CLUSTER  ?= kubemedic
 CONTEXT  := kind-$(CLUSTER)
 SCENARIO ?=
 LAB      := $(PYTHON) -m lab --context $(CONTEXT)
 
-.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all validate test lint
+.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check validate test lint
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
@@ -39,10 +41,16 @@ check-all: ## Assert every fault is observable
 reset-all: ## Remove every scenario
 	$(LAB) reset --all
 
+agent-rbac: ## Install the agent's read-only identity (ServiceAccount + ClusterRole)
+	kubectl --context $(CONTEXT) apply -f deploy/agent/rbac.yaml
+
+rbac-check: ## Prove the agent can read scenarios but not Secrets, writes or other namespaces
+	CONTEXT=$(CONTEXT) ./scripts/check-agent-rbac.sh
+
 validate: ## Validate scenario definitions (and manifests, if kubeconform is installed)
 	$(PYTHON) -m lab validate
 	@if command -v kubeconform >/dev/null; then \
-		kubeconform -strict -summary -ignore-filename-pattern 'expected.yaml' scenarios/; \
+		kubeconform -strict -summary -ignore-filename-pattern 'expected.yaml' scenarios/ deploy/; \
 	else echo "kubeconform not installed; skipping manifest schema check"; fi
 
 test: ## Run unit tests

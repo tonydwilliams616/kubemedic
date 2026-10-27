@@ -1,0 +1,44 @@
+# Read-only identity for the kubemedic agent: a ServiceAccount plus a role that can look at workloads but never change them or read Secrets.
+#
+# How the scoping works:
+# - The ClusterRole only DEFINES the permissions. On its own it grants nothing.
+# - The lab adds a RoleBinding in each km-* scenario namespace when it breaks a
+#   scenario, so the agent can only see namespaces the lab manages.
+# - There is deliberately no ClusterRoleBinding: kube-system and every other
+#   namespace stay invisible to the agent.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kubemedic-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubemedic-agent
+  namespace: kubemedic-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubemedic-agent-read
+rules:
+  # What is running and what state it's in.
+  - apiGroups: [""]
+    resources: [pods, pods/log, events]
+    verbs: [get, list, watch]
+  - apiGroups: [events.k8s.io]
+    resources: [events]
+    verbs: [get, list, watch]
+  # Rollout history, needed to tell "new revision broke" from "always broken".
+  - apiGroups: [apps]
+    resources: [deployments, replicasets]
+    verbs: [get, list, watch]
+  # ConfigMaps are needed for config faults (e.g. a missing key).
+  # RISK: ConfigMaps sometimes hold sensitive values. The agent's tools will
+  # return key names only, never values, before anything reaches the LLM.
+  - apiGroups: [""]
+    resources: [configmaps]
+    verbs: [get, list]
+  # Not granted, on purpose: secrets, pods/exec, pods/portforward, and every
+  # write verb (create, update, patch, delete). Fixes will go through a
+  # separate executor with its own identity in Phase 3.

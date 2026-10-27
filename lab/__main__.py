@@ -1,13 +1,31 @@
-"""CLI: python -m lab [--context CTX] {list,validate,break,check,reset} [ID | --all]"""
+"""Command-line entry point that turns list, validate, break, check and reset into actions.
+
+Usage: python -m lab [--context CTX] {list,validate,break,check,reset} [ID | --all]
+"""
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 
 from . import scenarios
 from .check import evaluate
 from .kube import KubeError, Kubectl, ensure_safe_context
+
+AGENT_SA = {"kind": "ServiceAccount", "name": "kubemedic-agent", "namespace": "kubemedic-system"}
+AGENT_ROLE = "kubemedic-agent-read"  # ClusterRole defined in deploy/agent/rbac.yaml
+
+
+def agent_read_binding(namespace: str) -> dict:
+    """RoleBinding granting the agent's read-only ClusterRole inside one namespace only."""
+    return {
+        "apiVersion": "rbac.authorization.k8s.io/v1",
+        "kind": "RoleBinding",
+        "metadata": {"name": "kubemedic-agent-read", "namespace": namespace},
+        "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": AGENT_ROLE},
+        "subjects": [AGENT_SA],
+    }
 
 
 def _targets(args) -> list[scenarios.Scenario]:
@@ -42,6 +60,8 @@ def cmd_break(args) -> int:
             "kubemedic.io/managed": "true",
             "kubemedic.io/scenario": s.id,
         })
+        # Let the agent read this namespace (and only namespaces like it).
+        k.run("apply", "-f", "-", stdin=json.dumps(agent_read_binding(s.namespace)))
         if s.has_base:
             k.run("apply", "-n", s.namespace, "-f", str(s.base_file))
             k.run("rollout", "status", "-n", s.namespace, f"deployment/{s.deployment}", "--timeout=180s")
