@@ -46,6 +46,7 @@ jobs:
       - run: make break-all
       - run: make check-all
       - run: make rbac-check
+      - run: make evidence SCENARIO=crashloop-bad-config-path
       - name: Dump state on failure
         if: failure()
         run: |
