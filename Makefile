@@ -6,7 +6,7 @@ CONTEXT  := kind-$(CLUSTER)
 SCENARIO ?=
 LAB      := $(PYTHON) -m lab --context $(CONTEXT)
 
-.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check validate test lint
+.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence validate test lint
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
@@ -46,6 +46,10 @@ agent-rbac: ## Install the agent's read-only identity (ServiceAccount + ClusterR
 
 rbac-check: ## Prove the agent can read scenarios but not Secrets, writes or other namespaces
 	CONTEXT=$(CONTEXT) ./scripts/check-agent-rbac.sh
+
+evidence: ## Print the agent's evidence bundle for a scenario: make evidence SCENARIO=oom-killed
+	@test -n "$(SCENARIO)" || (echo "SCENARIO is required" && exit 1)
+	$(PYTHON) -m kubemedic.evidence --namespace km-$(SCENARIO) --context $(CONTEXT)
 
 validate: ## Validate scenario definitions (and manifests, if kubeconform is installed)
 	$(PYTHON) -m lab validate
