@@ -1,3 +1,4 @@
+# Answer key for failing-readiness-probe: what the fault looks like, its true root cause, and which fixes are right or wrong.
 id: failing-readiness-probe
 title: Rollout stalls because the new readiness probe path returns 404
 category: probe

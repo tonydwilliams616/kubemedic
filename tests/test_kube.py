@@ -1,3 +1,4 @@
+"""Checks the lab refuses to break anything except a local kind cluster."""
 import pytest
 
 from lab.kube import KubeError, ensure_safe_context

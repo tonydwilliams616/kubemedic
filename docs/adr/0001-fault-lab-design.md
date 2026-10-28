@@ -1,5 +1,7 @@
 # ADR 0001: Fault-injection lab as the foundation
 
+Records why the Phase 0 lab is built the way it is.
+
 Status: accepted, Phase 0
 
 ## Context

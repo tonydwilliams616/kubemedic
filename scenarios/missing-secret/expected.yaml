@@ -1,3 +1,4 @@
+# Answer key for missing-secret: what the fault looks like, its true root cause, and which fixes are right or wrong.
 id: missing-secret
 title: Pod cannot start because a referenced Secret does not exist
 category: secret
