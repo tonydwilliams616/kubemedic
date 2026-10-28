@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from kubemedic.diagnose import SYSTEM_PROMPT, build_user_message, diagnose, parse_json
+from kubemedic.diagnose import PROMPT_VERSION, SYSTEM_PROMPT, build_user_message, diagnose, parse_json
 
 GOOD = {"root_cause": "Worker exceeds its 64Mi memory limit since CACHE_MB=200",
         "evidence": ["last_terminated reason OOMKilled", "CACHE_MB=200"],
@@ -73,3 +73,7 @@ def test_evidence_is_fenced_as_untrusted_data():
 def test_system_prompt_lists_exactly_the_contract_actions():
     for action in ("rollback", "rollout_restart", "scale", "escalate"):
         assert f"- {action}:" in SYSTEM_PROMPT
+
+
+def test_results_record_the_prompt_version():
+    assert diagnose(BUNDLE, FakeModel(json.dumps(GOOD))).prompt_version == PROMPT_VERSION

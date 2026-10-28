@@ -20,7 +20,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Callable
 
-from kubemedic.diagnose import DEFAULT_MODEL, diagnose
+from kubemedic.diagnose import DEFAULT_MODEL, PROMPT_VERSION, diagnose
 from lab import scenarios
 from lab.scenarios import Scenario
 
@@ -74,6 +74,7 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict], 
 
     summary = {
         "model": model.model_id,
+        "prompt_version": PROMPT_VERSION,
         "repeats": repeats,
         "runs": len(all_scores),
         **summarise(all_scores),
@@ -89,7 +90,7 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict], 
 
 def print_scorecard(summary: dict) -> None:
     n = summary["repeats"]
-    print(f"\nmodel: {summary['model']}   repeats: {n}")
+    print(f"\nmodel: {summary['model']}   prompt: {summary['prompt_version']}   repeats: {n}")
     print(f"{'scenario':<28} {'pass':<6} {'cause':<6} {'action':<7} {'unsafe':<7} actions chosen")
     for row in summary["per_scenario"]:
         print(f"{row['scenario']:<28} {row['passed']}/{n:<4} {row['root_cause_ok']}/{n:<4} "
@@ -130,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
 
     selected = [scenarios.load(i) for i in args.scenario] if args.scenario else scenarios.load_all()
     safe_model = args.model.replace(":", "_").replace("/", "_")
-    out_dir = REPORTS_DIR / f"{time.strftime('%Y%m%d-%H%M%S')}-{safe_model}"
+    out_dir = REPORTS_DIR / f"{time.strftime('%Y%m%d-%H%M%S')}-{safe_model}-prompt{PROMPT_VERSION}"
 
     try:
         summary = run_eval(selected, BedrockModel(args.model), lambda ns: gather(ns, args.context),
