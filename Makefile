@@ -5,9 +5,10 @@ PYTHON   ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 CLUSTER  ?= kubemedic
 CONTEXT  := kind-$(CLUSTER)
 SCENARIO ?=
+REPEATS  ?= 3
 LAB      := $(PYTHON) -m lab --context $(CONTEXT)
 
-.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence diagnose validate test lint
+.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence diagnose eval validate test lint
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
@@ -55,6 +56,9 @@ evidence: ## Print the agent's evidence bundle for a scenario: make evidence SCE
 diagnose: ## Ask the LLM to diagnose a scenario: make diagnose SCENARIO=oom-killed [MODEL=<bedrock model id>]
 	@test -n "$(SCENARIO)" || (echo "SCENARIO is required" && exit 1)
 	$(PYTHON) -m kubemedic.diagnose --namespace km-$(SCENARIO) --context $(CONTEXT) $(if $(MODEL),--model $(MODEL))
+
+eval: ## Score the diagnoser on every broken scenario: make eval [MODEL=<id>] [REPEATS=3]
+	$(PYTHON) -m evals.run --context $(CONTEXT) --repeats $(REPEATS) $(if $(MODEL),--model $(MODEL))
 
 validate: ## Validate scenario definitions (and manifests, if kubeconform is installed)
 	$(PYTHON) -m lab validate

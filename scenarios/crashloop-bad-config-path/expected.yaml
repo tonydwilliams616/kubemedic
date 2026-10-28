@@ -5,8 +5,11 @@ category: config
 difficulty: medium
 target: { kind: Deployment, name: api, selector: app=api }
 
+# A crash-looping pod cycles running -> terminated -> CrashLoopBackOff, so the waiting
+# reason is only true some of the time. lastState keeps the crash reason permanently
+# after the first restart, so a single snapshot always sees it.
 observable:
-  waiting_reason: [CrashLoopBackOff]
+  terminated_reason: [Error]
 
 root_cause: >-
   The latest revision of Deployment api sets CONFIG_PATH=/etc/app/settings.yaml,
