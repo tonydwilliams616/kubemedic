@@ -13,7 +13,7 @@ LLM agents are non-deterministic, so "it worked when I tried it" isn't evidence.
 Requires Docker, [kind](https://kind.sigs.k8s.io/) v0.24+, kubectl and Python 3.11+.
 
 ```bash
-pip install -r requirements-dev.txt
+python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt   # make uses .venv automatically
 make cluster-up                         # 1 control plane + 1 worker, Kubernetes 1.31
 make list                               # show scenarios
 make break SCENARIO=oom-killed          # inject one fault

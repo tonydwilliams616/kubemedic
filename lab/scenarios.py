@@ -13,13 +13,12 @@ from pathlib import Path
 import yaml
 from jsonschema import Draft202012Validator
 
+from kubemedic.contract import ACTIONS  # one action list for agent, lab and evals
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCENARIOS_DIR = REPO_ROOT / "scenarios"
 NAMESPACE_PREFIX = "km-"
 
-# The agent's future action vocabulary. Kept here so scenarios and the
-# Phase 3 executor share one list. "escalate" means "hand to a human, act on nothing".
-ACTIONS = ["rollout_restart", "rollback", "scale", "escalate"]
 CATEGORIES = ["image", "resources", "config", "secret", "probe", "scheduling"]
 
 SCHEMA = {

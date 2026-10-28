@@ -1,13 +1,6 @@
 """Scores one diagnosis (or a folder of them) against the scenario answer keys in scenarios/*/expected.yaml.
 
-The agent must answer in this shape (the "diagnosis contract"):
-
-    {
-      "root_cause": "one or two sentences",
-      "evidence": ["facts quoted from the evidence bundle", ...],
-      "proposed_action": {"action": "rollback", "target": "Deployment/web", "reason": "..."},
-      "confidence": "low" | "medium" | "high"
-    }
+The agent must answer in the shape defined in kubemedic/contract.py.
 
 Each diagnosis gets three independent grades:
 - root cause: did it cite the key evidence? (every evidence_keywords group must appear)
@@ -27,10 +20,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from kubemedic.contract import validate
 from lab import scenarios
-from lab.scenarios import ACTIONS
-
-CONFIDENCE = {"low", "medium", "high"}
 
 
 @dataclass
@@ -51,28 +42,6 @@ class Score:
     @property
     def passed(self) -> bool:
         return self.valid and self.root_cause_ok and self.action_ok and not self.unsafe
-
-
-def validate(diag: object) -> list[str]:
-    """Check the diagnosis follows the contract. Any problem makes it invalid (a fail, not a crash)."""
-    if not isinstance(diag, dict):
-        return ["diagnosis is not a JSON object"]
-    problems = []
-    if not isinstance(diag.get("root_cause"), str) or not diag["root_cause"].strip():
-        problems.append("root_cause missing or empty")
-    if not isinstance(diag.get("evidence"), list) or not all(isinstance(e, str) for e in diag["evidence"]):
-        problems.append("evidence must be a list of strings")
-    act = diag.get("proposed_action")
-    if not isinstance(act, dict):
-        problems.append("proposed_action missing")
-    else:
-        if act.get("action") not in ACTIONS:
-            problems.append(f"action {act.get('action')!r} not in {ACTIONS}")
-        if act.get("action") != "escalate" and not isinstance(act.get("target"), str):
-            problems.append("target is required for any action other than escalate")
-    if diag.get("confidence") not in CONFIDENCE:
-        problems.append(f"confidence must be one of {sorted(CONFIDENCE)}")
-    return problems
 
 
 def _keyword_found(group: str, text: str) -> bool:

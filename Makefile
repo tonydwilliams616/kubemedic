@@ -1,12 +1,13 @@
 # Short commands (make break, make check, ...) that wrap the lab tool and kind.
 
-PYTHON   ?= python3
+# Use the project's .venv if it exists, so make always runs the Python that has our packages.
+PYTHON   ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 CLUSTER  ?= kubemedic
 CONTEXT  := kind-$(CLUSTER)
 SCENARIO ?=
 LAB      := $(PYTHON) -m lab --context $(CONTEXT)
 
-.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence validate test lint
+.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence diagnose validate test lint
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
@@ -50,6 +51,10 @@ rbac-check: ## Prove the agent can read scenarios but not Secrets, writes or oth
 evidence: ## Print the agent's evidence bundle for a scenario: make evidence SCENARIO=oom-killed
 	@test -n "$(SCENARIO)" || (echo "SCENARIO is required" && exit 1)
 	$(PYTHON) -m kubemedic.evidence --namespace km-$(SCENARIO) --context $(CONTEXT)
+
+diagnose: ## Ask the LLM to diagnose a scenario: make diagnose SCENARIO=oom-killed [MODEL=<bedrock model id>]
+	@test -n "$(SCENARIO)" || (echo "SCENARIO is required" && exit 1)
+	$(PYTHON) -m kubemedic.diagnose --namespace km-$(SCENARIO) --context $(CONTEXT) $(if $(MODEL),--model $(MODEL))
 
 validate: ## Validate scenario definitions (and manifests, if kubeconform is installed)
 	$(PYTHON) -m lab validate
