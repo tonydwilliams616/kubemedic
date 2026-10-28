@@ -1,3 +1,4 @@
+# Answer key for oom-killed: what the fault looks like, its true root cause, and which fixes are right or wrong.
 id: oom-killed
 title: Worker exceeds its memory limit after a config change
 category: resources

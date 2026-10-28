@@ -1,3 +1,4 @@
+# Answer key for unschedulable-requests: what the fault looks like, its true root cause, and which fixes are right or wrong.
 id: unschedulable-requests
 title: Pod stays Pending because it requests more CPU than any node has
 category: scheduling

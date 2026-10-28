@@ -1,3 +1,4 @@
+# Answer key for bad-image-tag: what the fault looks like, its true root cause, and which fixes are right or wrong.
 id: bad-image-tag
 title: Release points at an image tag that does not exist
 category: image

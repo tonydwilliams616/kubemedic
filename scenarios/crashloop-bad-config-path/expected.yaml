@@ -1,3 +1,4 @@
+# Answer key for crashloop-bad-config-path: what the fault looks like, its true root cause, and which fixes are right or wrong.
 id: crashloop-bad-config-path
 title: App crash-loops because its config path no longer exists
 category: config

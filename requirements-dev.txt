@@ -1,3 +1,4 @@
+# Python packages needed to run the lab tool and its tests.
 pyyaml>=6.0
 jsonschema>=4.21
 pytest>=8.0

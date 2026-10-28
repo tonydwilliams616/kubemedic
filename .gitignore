@@ -1,3 +1,4 @@
+# Files git should never track: Python caches, virtualenvs, local reports and secrets.
 __pycache__/
 *.pyc
 .venv/
