@@ -27,7 +27,11 @@ spec:
             - |
               import os, time
               mb = int(os.environ["CACHE_MB"])
-              cache = "x" * (mb * 1024 * 1024)
+              # Allocate in 1 MB chunks, writing every byte. Small requests are never refused up
+              # front, so the only thing that can stop us is the kernel's memory limit: the crash
+              # is then always OOMKilled. (One 200 MB request was sometimes refused by Python
+              # itself, which showed up as a plain "Error" and made the scenario flaky.)
+              cache = [b"x" * (1024 * 1024) for _ in range(mb)]
               print(f"worker started, cache={mb}MB", flush=True)
               time.sleep(10**9)
           env:
