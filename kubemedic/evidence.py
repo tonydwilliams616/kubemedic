@@ -124,21 +124,61 @@ def summarise_deployment(dep: dict, replicasets: list[dict]) -> dict:
     }
 
 
+def _container_view(c: dict) -> dict:
+    """The parts of a container spec that releases usually change, with secret values hidden."""
+    return {
+        "image": c.get("image"),
+        "env": {e["name"]: _env_entry(e).get("value", _env_entry(e).get("from")) for e in c.get("env", [])},
+        "readiness_probe": _probe(c.get("readinessProbe")),
+        "liveness_probe": _probe(c.get("livenessProbe")),
+        "resources": c.get("resources", {}),
+    }
+
+
+def template_changes(old: dict, new: dict) -> list[str]:
+    """Human-readable differences between two pod templates: what the release actually changed."""
+    changes = []
+    old_c = {c["name"]: _container_view(c) for c in old.get("spec", {}).get("containers", [])}
+    new_c = {c["name"]: _container_view(c) for c in new.get("spec", {}).get("containers", [])}
+    for name in sorted(old_c.keys() | new_c.keys()):
+        if name not in old_c or name not in new_c:
+            changes.append(f"container {name}: {'added' if name in new_c else 'removed'}")
+            continue
+        o, n = old_c[name], new_c[name]
+        for field in ("image", "readiness_probe", "liveness_probe", "resources"):
+            if o[field] != n[field]:
+                changes.append(f"container {name}: {field} {json.dumps(o[field])} -> {json.dumps(n[field])}")
+        for var in sorted(o["env"].keys() | n["env"].keys()):
+            if o["env"].get(var) != n["env"].get(var):
+                changes.append(f"container {name}: env {var} {json.dumps(o['env'].get(var))} -> {json.dumps(n['env'].get(var))}")
+    return changes
+
+
 def rollout_history(dep: dict, replicasets: list[dict]) -> list[dict]:
-    """Revisions oldest -> newest, so the model can see what changed in the latest release."""
+    """Revisions oldest -> newest: which one is current, and what each changed versus the one before.
+
+    Deliberately no per-revision ready counts: an old revision has 0 ready pods simply because it
+    was scaled down, which says nothing about whether it was healthy. That misled the model in v1.
+    """
     uid = dep["metadata"].get("uid")
+    current = dep["metadata"].get("annotations", {}).get("deployment.kubernetes.io/revision")
     owned = [rs for rs in replicasets
              if any(o.get("uid") == uid for o in rs["metadata"].get("ownerReferences", []))]
-    history = []
+    owned.sort(key=lambda rs: int(rs["metadata"].get("annotations", {}).get("deployment.kubernetes.io/revision", 0)))
+    history, previous = [], None
     for rs in owned:
         ann = rs["metadata"].get("annotations", {})
+        revision = ann.get("deployment.kubernetes.io/revision", "0")
+        tmpl = rs["spec"]["template"]
         history.append({
-            "revision": int(ann.get("deployment.kubernetes.io/revision", 0)),
+            "revision": int(revision),
+            "current": revision == current,
             "change_cause": ann.get("kubernetes.io/change-cause"),
-            "images": [c.get("image") for c in rs["spec"]["template"]["spec"].get("containers", [])],
-            "ready_replicas": rs.get("status", {}).get("readyReplicas", 0),
+            "images": [c.get("image") for c in tmpl["spec"].get("containers", [])],
+            "changes_from_previous": template_changes(previous, tmpl) if previous else None,
         })
-    return sorted(history, key=lambda h: h["revision"])
+        previous = tmpl
+    return history
 
 
 def configmap_keys(cm: dict) -> dict:

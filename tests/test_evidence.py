@@ -3,7 +3,7 @@ import json
 
 from kubemedic.evidence import (
     AGENT_USER, configmap_keys, gather, rollout_history, summarise_deployment,
-    summarise_events, summarise_pod,
+    summarise_events, summarise_pod, template_changes,
 )
 from kubemedic.redact import MASK
 
@@ -22,7 +22,7 @@ def pod(name="api-1", waiting=None, last_terminated=None, restarts=0, ready=Fals
 
 def deployment():
     return {
-        "metadata": {"name": "api", "uid": "dep-uid"},
+        "metadata": {"name": "api", "uid": "dep-uid", "annotations": {"deployment.kubernetes.io/revision": "2"}},
         "spec": {"replicas": 1, "template": {"spec": {
             "containers": [{
                 "name": "api", "image": "busybox:1.36",
@@ -40,12 +40,13 @@ def deployment():
     }
 
 
-def replicaset(revision, image, cause, owner="dep-uid"):
+def replicaset(revision, image, cause, owner="dep-uid", env=None):
+    container = {"name": "api", "image": image, "env": env or []}
     return {
         "metadata": {"annotations": {"deployment.kubernetes.io/revision": str(revision),
                                      "kubernetes.io/change-cause": cause},
                      "ownerReferences": [{"uid": owner}]},
-        "spec": {"template": {"spec": {"containers": [{"image": image}]}}},
+        "spec": {"template": {"spec": {"containers": [container]}}},
         "status": {"readyReplicas": 1 if revision == 1 else 0},
     }
 
@@ -79,13 +80,33 @@ def test_deployment_summary_includes_probe_and_configmaps():
     assert d["configmaps_used"] == ["api-config"]
 
 
-def test_rollout_history_is_ordered_and_ignores_other_deployments():
+def test_rollout_history_is_ordered_marks_current_and_ignores_other_deployments():
     rss = [replicaset(2, "nginx:1.27.99-alpine", "release 1.5.0"),
            replicaset(1, "nginx:1.27-alpine", "release 1.4.0"),
            replicaset(7, "other:1", "unrelated", owner="someone-else")]
     h = rollout_history(deployment(), rss)
-    assert [r["revision"] for r in h] == [1, 2]
-    assert h[-1]["images"] == ["nginx:1.27.99-alpine"] and h[-1]["change_cause"] == "release 1.5.0"
+    assert [(r["revision"], r["current"]) for r in h] == [(1, False), (2, True)]
+    assert h[0]["changes_from_previous"] is None          # nothing before the first revision
+    assert h[1]["changes_from_previous"] == ['container api: image "nginx:1.27-alpine" -> "nginx:1.27.99-alpine"']
+    assert "ready_replicas" not in h[0]                    # scaled-down != unhealthy; no longer shown
+
+
+def test_template_changes_shows_env_and_probe_changes():
+    old = {"spec": {"containers": [{"name": "w", "image": "x", "env": [{"name": "CACHE_MB", "value": "16"}],
+                                    "readinessProbe": {"httpGet": {"path": "/", "port": 80}}}]}}
+    new = {"spec": {"containers": [{"name": "w", "image": "x", "env": [{"name": "CACHE_MB", "value": "200"}],
+                                    "readinessProbe": {"httpGet": {"path": "/healthz", "port": 80}}}]}}
+    assert template_changes(old, new) == [
+        'container w: readiness_probe {"httpGet": "/:80"} -> {"httpGet": "/healthz:80"}',
+        'container w: env CACHE_MB "16" -> "200"',
+    ]
+
+
+def test_template_changes_never_reveal_secret_values():
+    old = {"spec": {"containers": [{"name": "w", "env": [{"name": "DB_PASSWORD", "value": "old-secret-1"}]}]}}
+    new = {"spec": {"containers": [{"name": "w", "env": [{"name": "DB_PASSWORD", "value": "new-secret-2"}]}]}}
+    out = json.dumps(template_changes(old, new))
+    assert "old-secret-1" not in out and "new-secret-2" not in out
 
 
 def test_configmap_returns_key_names_never_values():
