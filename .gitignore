@@ -8,3 +8,4 @@ reports/
 .env
 *.kubeconfig
 aws-login.sh
+.cache/
