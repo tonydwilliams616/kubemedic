@@ -11,6 +11,9 @@ observable:
     reason: FailedScheduling
     message_contains: "Insufficient cpu"
 
+# The runbook page a good search should return for this incident (Phase 2 retrieval eval).
+relevant_runbooks: [pending-unschedulable]
+
 root_cause: >-
   Deployment reports requests 64 CPU cores (likely meant 64m). No node has
   that much allocatable CPU, so the scheduler cannot place the pod and it

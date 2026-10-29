@@ -11,6 +11,9 @@ target: { kind: Deployment, name: api, selector: app=api }
 observable:
   terminated_reason: [Error]
 
+# The runbook page a good search should return for this incident (Phase 2 retrieval eval).
+relevant_runbooks: [crashloopbackoff]
+
 root_cause: >-
   The latest revision of Deployment api sets CONFIG_PATH=/etc/app/settings.yaml,
   but ConfigMap api-config only has the key config.yaml, so the file is
