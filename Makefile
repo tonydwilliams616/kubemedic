@@ -8,7 +8,7 @@ SCENARIO ?=
 REPEATS  ?= 3
 LAB      := $(PYTHON) -m lab --context $(CONTEXT)
 
-.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence diagnose eval validate test lint
+.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose eval validate test lint
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
@@ -52,6 +52,10 @@ rbac-check: ## Prove the agent can read scenarios but not Secrets, writes or oth
 evidence: ## Print the agent's evidence bundle for a scenario: make evidence SCENARIO=oom-killed
 	@test -n "$(SCENARIO)" || (echo "SCENARIO is required" && exit 1)
 	$(PYTHON) -m kubemedic.evidence --namespace km-$(SCENARIO) --context $(CONTEXT)
+
+search: ## Show which runbooks the agent would retrieve: make search SCENARIO=oom-killed
+	@test -n "$(SCENARIO)" || (echo "SCENARIO is required" && exit 1)
+	$(PYTHON) -m kubemedic.retrieve --namespace km-$(SCENARIO) --context $(CONTEXT)
 
 diagnose: ## Ask the LLM to diagnose a scenario: make diagnose SCENARIO=oom-killed [MODEL=<bedrock model id>]
 	@test -n "$(SCENARIO)" || (echo "SCENARIO is required" && exit 1)
