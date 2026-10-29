@@ -11,6 +11,9 @@ observable:
     reason: Unhealthy
     message_contains: "Readiness probe failed"
 
+# The runbook page a good search should return for this incident (Phase 2 retrieval eval).
+relevant_runbooks: [readiness-probe-failing]
+
 root_cause: >-
   The latest revision of Deployment frontend changed its readiness probe to
   GET /healthz, which nginx does not serve (HTTP 404). New pods never become

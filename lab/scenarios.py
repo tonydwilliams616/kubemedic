@@ -25,7 +25,7 @@ SCHEMA = {
     "type": "object",
     "additionalProperties": False,
     "required": [
-        "id", "title", "category", "difficulty", "target", "observable",
+        "id", "title", "category", "difficulty", "target", "observable", "relevant_runbooks",
         "root_cause", "evidence_keywords", "acceptable_actions", "forbidden_actions",
     ],
     "properties": {
@@ -71,6 +71,7 @@ SCHEMA = {
                 },
             },
         },
+        "relevant_runbooks": {"type": "array", "items": {"type": "string"}, "minItems": 1, "uniqueItems": True},
         "root_cause": {"type": "string", "minLength": 30},
         "evidence_keywords": {"type": "array", "items": {"type": "string"}, "minItems": 1},
         "acceptable_actions": {"type": "array", "items": {"enum": ACTIONS}, "minItems": 1, "uniqueItems": True},
@@ -138,6 +139,11 @@ def validate(s: Scenario) -> list[str]:
     overlap = set(spec["acceptable_actions"]) & set(spec["forbidden_actions"])
     if overlap:
         errors.append(f"{s.id}: actions both acceptable and forbidden: {sorted(overlap)}")
+    from kubemedic.runbooks import load_all as load_runbooks  # local import: only needed here
+    known = {rb.id for rb in load_runbooks()}
+    unknown = [r for r in spec["relevant_runbooks"] if r not in known]
+    if unknown:
+        errors.append(f"{s.id}: relevant_runbooks not found in runbooks/: {unknown}")
     if "rollback" in spec["acceptable_actions"] and not s.has_base:
         errors.append(f"{s.id}: rollback is acceptable but there is no base.yaml to roll back to")
     if not s.break_file.is_file():

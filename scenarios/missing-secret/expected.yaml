@@ -8,6 +8,9 @@ target: { kind: Deployment, name: payments, selector: app=payments }
 observable:
   waiting_reason: [CreateContainerConfigError]
 
+# The runbook page a good search should return for this incident (Phase 2 retrieval eval).
+relevant_runbooks: [createcontainerconfigerror]
+
 root_cause: >-
   Deployment payments reads DB_PASSWORD from Secret payments-db (key
   password), but that Secret does not exist in the namespace, so the

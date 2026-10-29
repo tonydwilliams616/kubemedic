@@ -10,6 +10,9 @@ observable:
   waiting_reason: [ErrImagePull, ImagePullBackOff]
 
 # Ground truth the Phase 1 scorer compares the agent's diagnosis against.
+# The runbook page a good search should return for this incident (Phase 2 retrieval eval).
+relevant_runbooks: [image-pull-errors]
+
 root_cause: >-
   Deployment web was updated to image nginx:1.27.99-alpine, which does not
   exist in the registry, so the new ReplicaSet's pods cannot pull it. The
