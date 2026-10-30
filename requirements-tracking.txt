@@ -1,0 +1,2 @@
+# Optional: MLflow for experiment tracking (make tracking-setup). Kept out of requirements-dev.txt so CI stays small and fast.
+mlflow>=3.0
