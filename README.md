@@ -53,6 +53,23 @@ make eval-retrieval                               # score runbook search alone, 
 
 A full eval (18 diagnoses) on Amazon Nova Lite costs under 1 US cent.
 
+### Evals as a CI gate (record / replay)
+
+```bash
+make record         # live RAG eval once; saves evidence, retrieved runbooks and every model reply
+make eval-replay    # re-score those replies through the current code and apply evals/gate.yaml
+```
+
+Calling Bedrock from CI would need cloud credentials, cost money and fail at random on model
+noise. Instead, every PR replays the committed recording (`evals/recordings/`) through its own
+code: prompt building, contract checks, citation checks, guardrails and scoring. The `eval-gate`
+job fails the PR if pass rate, action or citation accuracy drop below 90%, or if any answer is
+unsafe or invalid. It needs no AWS credentials and no cluster, and takes seconds.
+
+Each recorded request is fingerprinted (model + system prompt + messages). Changing the prompt,
+a runbook page or the evidence format makes the recording stale, and replay refuses to continue,
+so a prompt change has to ship with a fresh recording that still passes the gate.
+
 ### Track and compare runs (MLflow)
 
 ```bash
@@ -98,6 +115,14 @@ Amazon Nova Lite (`us.amazon.nova-lite-v1:0`), 6 scenarios × 3 repeats, tempera
 - *A code guardrail fixed what the prompt couldn't.* A rollback with nothing to roll back to is now blocked and turned into "escalate" (fail closed). In this run the model escalated on its own, so the guardrail never had to fire, but it is there for when the model doesn't.
 - *RAG costs about 2.7× the tokens; the guardrail costs nothing.* The runbooks add text to every prompt; the guardrail is plain code.
 - *The eval set is now saturated* (100% on everything), so it can no longer tell a better model from a worse one. Harder, held-out scenarios come next.
+
+**Recorded for the CI gate (30 October, live run):** pass 94%, root cause 94%, action 100%,
+unsafe 0, citations 100%. The guardrail fired for real for the first time: on
+`unschedulable-requests` the model's final answer proposed a rollback although the Deployment
+has no earlier revision, and the guardrail overrode it to escalate. The one failed run is a grader
+miss rather than a wrong diagnosis: the model correctly found the 64-CPU request but never used
+the word "Unschedulable", which the keyword-based root cause check requires. That is the case
+for an LLM-as-judge grader later.
 
 ### Runbook search
 
@@ -146,7 +171,8 @@ lab/                      Python CLI: validate, break, check, reset
 deploy/agent/rbac.yaml    the agent's read-only identity
 kubemedic/                the agent: contract, redaction, evidence, diagnosis
 runbooks/                 symptom-first runbooks the agent retrieves and cites
-evals/                    scorers, eval runners, MLflow tracking, model prices
+evals/                    scorers, eval runners, record/replay, merge gate, MLflow tracking, model prices
+evals/recordings/         recorded model answers that CI replays on every PR
 tests/                    unit tests (no cluster or AWS needed)
 .github/workflows/ci.yaml lint + tests, then break, check, RBAC-check and evidence on a live kind cluster
 ```
@@ -158,8 +184,8 @@ tests/                    unit tests (no cluster or AWS needed)
 | 0 | Fault-injection lab and verified scenarios ✅ |
 | 1 | Read-only diagnoser on Amazon Bedrock and an eval harness ✅ |
 | 2 | RAG over symptom-first runbooks: retrieval eval, citations, with vs without comparison ✅ |
-| 3 | Experiment tracking with MLflow ✅; evals as a CI gate (recorded model answers replayed on every PR) ← *here* |
-| 4 | Tool-using agent: the model chooses what to inspect next, step by step, instead of one fixed bundle |
+| 3 | Experiment tracking with MLflow; evals as a CI gate (recorded model answers replayed on every PR) ✅ |
+| 4 | Tool-using agent: the model chooses what to inspect next, step by step, instead of one fixed bundle ← *next* |
 | 5 | Allowlisted remediation executor with its own identity, human approval and an audit log |
 | 6 | Self-hosted open model on EKS: Karpenter GPU nodes, vLLM serving, scale to zero; accuracy, latency and cost per diagnosis compared with Bedrock |
 | 7 | Production metrics: tokens, cost, latency and success rate in Prometheus/Grafana |

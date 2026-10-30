@@ -7,8 +7,13 @@ Design choices:
   varies between repeats is the model, which is exactly what repeats are meant to measure.
 - Several repeats per scenario, because the same input can produce different answers.
 - Everything is written to reports/<timestamp>-<model>/ so runs can be compared later.
+- --record saves the evidence and every model reply; --replay reruns them through the current
+  code with no AWS or cluster (see evals/cassette.py); --gate fails the run if scores drop
+  below evals/gate.yaml. CI uses --replay with --gate.
 
-Usage: python -m evals.run [--model MODEL_ID] [--repeats 3] [--scenario ID ...]
+Usage: python -m evals.run [--model MODEL_ID] [--repeats 3] [--scenario ID ...] [--rag]
+       python -m evals.run --rag --record evals/recordings/<name>
+       python -m evals.run --replay evals/recordings/<name> --gate evals/gate.yaml
 """
 from __future__ import annotations
 
@@ -25,6 +30,8 @@ from kubemedic.retrieve import EMBED_MODEL
 from lab import scenarios
 from lab.scenarios import Scenario
 
+from . import gate
+from .cassette import Player, Recorder
 from .score import Score, score, summarise
 
 REPORTS_DIR = Path("reports")
@@ -142,10 +149,10 @@ def _cluster_check(context: str) -> Callable[[Scenario], tuple[bool, str]]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    from botocore.exceptions import BotoCoreError, ClientError
-
-    from kubemedic.diagnose import BedrockModel
-    from kubemedic.evidence import gather
+    try:
+        from botocore.exceptions import BotoCoreError, ClientError
+    except ImportError:   # a replay needs no AWS libraries at all
+        BotoCoreError = ClientError = type("AWSNotInstalled", (Exception,), {})  # noqa: N806
 
     p = argparse.ArgumentParser(description="Score the diagnoser on every broken scenario")
     p.add_argument("--model", default=DEFAULT_MODEL)
@@ -153,21 +160,39 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--scenario", action="append", help="limit to these scenario ids (repeatable)")
     p.add_argument("--context", default="kind-kubemedic")
     p.add_argument("--rag", action="store_true", help="retrieve the top 3 runbooks per scenario (prompt v3)")
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument("--record", type=Path, metavar="DIR", help="also save evidence and every model reply to DIR")
+    mode.add_argument("--replay", type=Path, metavar="DIR",
+                      help="rerun a recording through the current code: no AWS, no cluster, no cost")
+    p.add_argument("--gate", type=Path, metavar="FILE", help="exit 1 if the scores break the rules in FILE")
     args = p.parse_args(argv)
 
     selected = [scenarios.load(i) for i in args.scenario] if args.scenario else scenarios.load_all()
-    safe_model = args.model.replace(":", "_").replace("/", "_")
-    version = RAG_PROMPT_VERSION if args.rag else PROMPT_VERSION
-    out_dir = REPORTS_DIR / f"{time.strftime('%Y%m%d-%H%M%S')}-{safe_model}-prompt{version}"
 
     try:
-        retrieve_fn = None
-        if args.rag:
-            from kubemedic.retrieve import Retriever
-            retrieve_fn = Retriever().top_runbooks
-        summary = run_eval(selected, BedrockModel(args.model), lambda ns: gather(ns, args.context),
-                           args.repeats, out_dir, _cluster_check(args.context), retrieve_fn)
-    except RuntimeError as e:
+        if args.replay:
+            player = Player(args.replay)
+            model, gather_fn, check_fn = player, player.gather, None
+            retrieve_fn = player.retrieve if player.meta["rag"] else None
+            repeats, label = player.meta["repeats"], "replay"
+        else:
+            from kubemedic.diagnose import BedrockModel
+            from kubemedic.evidence import gather
+            model, check_fn, repeats = BedrockModel(args.model), _cluster_check(args.context), args.repeats
+            gather_fn = lambda ns: gather(ns, args.context)  # noqa: E731
+            retrieve_fn = None
+            if args.rag:
+                from kubemedic.retrieve import Retriever
+                retrieve_fn = Retriever().top_runbooks
+            label = "prompt" + (RAG_PROMPT_VERSION if args.rag else PROMPT_VERSION)
+            if args.record:
+                model = Recorder(model, args.record)
+                gather_fn = model.gathering(gather_fn)
+                retrieve_fn = model.retrieving(retrieve_fn) if retrieve_fn else None
+        safe_model = model.model_id.replace(":", "_").replace("/", "_")
+        out_dir = REPORTS_DIR / f"{time.strftime('%Y%m%d-%H%M%S')}-{safe_model}-{label}"
+        summary = run_eval(selected, model, gather_fn, repeats, out_dir, check_fn, retrieve_fn)
+    except RuntimeError as e:   # includes NotRecorded: replay hit something the recording lacks
         print(f"error: {e}", file=sys.stderr)
         return 2
     except BotoCoreError as e:
@@ -179,7 +204,20 @@ def main(argv: list[str] | None = None) -> int:
 
     print_scorecard(summary)
     print(f"\nfull results: {out_dir}/")
-    _track(summary, out_dir, {"embed_model": EMBED_MODEL} if args.rag else None)
+    if args.record:
+        model.save(summary)
+        print(f"recording saved: {args.record}/ (commit it so CI replays these answers)")
+    if args.replay:
+        print(f"replayed: {args.replay}/ recorded {player.meta['recorded_at']} (latency is not meaningful in a replay)")
+    else:  # a replay is a re-check of an old run, not a new experiment, so it isn't tracked
+        _track(summary, out_dir, {"embed_model": EMBED_MODEL} if args.rag else None)
+    if args.gate:
+        failures = gate.check(summary, gate.load(args.gate))
+        for f in failures:
+            print(f"GATE FAIL: {f}", file=sys.stderr)
+        if failures:
+            return 1
+        print(f"gate passed ({args.gate})")
     return 0
 
 

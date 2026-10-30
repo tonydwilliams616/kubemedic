@@ -12,3 +12,6 @@ aws-login.sh
 .mlflow/
 mlflow.db
 mlruns/
+
+# Half-finished eval recordings (evals/cassette.py swaps them in only when complete).
+*.partial/

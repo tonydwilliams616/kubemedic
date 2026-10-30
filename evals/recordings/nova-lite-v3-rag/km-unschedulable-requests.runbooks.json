@@ -1,0 +1,14 @@
+[
+ {
+  "id": "pending-unschedulable",
+  "score": 0.658
+ },
+ {
+  "id": "node-pressure-eviction",
+  "score": 0.429
+ },
+ {
+  "id": "rollout-stuck",
+  "score": 0.39
+ }
+]
