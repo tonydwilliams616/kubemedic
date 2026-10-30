@@ -2,7 +2,7 @@
 
 An AI agent that diagnoses Kubernetes failures, retrieves the relevant runbook, and proposes a fix from a small allowlist of actions. A human approves every change, and every step is audited.
 
-> **Status: Phase 1, read-only diagnoser.** The agent reads a broken namespace, diagnoses it with an LLM on Amazon Bedrock and proposes one allowlisted action. It cannot change anything yet; that arrives with the approval-gated executor in Phase 3.
+> **Status: Phase 2, RAG over runbooks.** The agent reads a broken namespace, retrieves the relevant runbook pages, diagnoses it with an LLM on Amazon Bedrock and proposes one allowlisted action. It cannot change anything yet; that arrives with the approval-gated executor in Phase 5.
 
 ## How it works
 
@@ -110,9 +110,10 @@ tests/                    unit tests (no cluster or AWS needed)
 | Phase | Scope |
 |---|---|
 | 0 | Fault-injection lab and verified scenarios ✅ |
-| 1 | Read-only diagnoser on Amazon Bedrock and an eval harness ← *here* |
-| 2 | RAG over runbooks, with citations |
-| 3 | Allowlisted remediation executor, human approval and audit log |
-| 4 | Alert-triggered runs and Prometheus/Grafana for agent metrics |
-| 5 | EKS with Terraform, spot nodes, scale to zero |
-| 6 | DR with Velero, restore behind approval |
+| 1 | Read-only diagnoser on Amazon Bedrock and an eval harness ✅ |
+| 2 | RAG over symptom-first runbooks: retrieval eval, citations, with vs without comparison ← *here* |
+| 3 | Experiment tracking with MLflow; evals as a CI gate (recorded model answers replayed on every PR) |
+| 4 | Tool-using agent: the model chooses what to inspect next, step by step, instead of one fixed bundle |
+| 5 | Allowlisted remediation executor with its own identity, human approval and an audit log |
+| 6 | Self-hosted open model on EKS: Karpenter GPU nodes, vLLM serving, scale to zero; accuracy, latency and cost per diagnosis compared with Bedrock |
+| 7 | Production metrics: tokens, cost, latency and success rate in Prometheus/Grafana |
