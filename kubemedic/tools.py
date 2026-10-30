@@ -20,6 +20,7 @@ Safety matters more now, because the model chooses what runs:
 from __future__ import annotations
 
 import json
+import re
 
 import jsonschema
 
@@ -116,6 +117,9 @@ class Toolbox:
         self.ns, self.k, self.retriever = namespace, kubectl, retriever
         self.log: list[dict] = []             # every call, in order
         self.runbooks_read: list[str] = []    # pages actually read: the only ones the model may cite
+        # Where questions actually get answered. Evals swap this for a recording or a replay
+        # (evals/cassette.py), so everything around it (validation, blinding, caps, logging) still runs.
+        self.backend = self._dispatch
 
     @property
     def names(self) -> list[str]:
@@ -134,15 +138,34 @@ class Toolbox:
                 jsonschema.validate(args, SPECS[name]["schema"])
             except jsonschema.ValidationError as e:
                 raise ToolError(f"invalid arguments for {name}: {e.message}") from None
-            result = getattr(self, f"_{name}")(**args)
+            result = self.backend(name, args)
         except ToolError as e:
             result = {"error": str(e)}
+        if name == "read_runbook" and "error" not in result and args["id"] not in self.runbooks_read:
+            self.runbooks_read.append(args["id"])
         result = blind_namespace(result, self.ns)   # e.g. event messages name the pod as <pod>_<namespace>
         text = json.dumps(result)
         if len(text) > MAX_RESULT_CHARS:
             result = {"truncated_to_chars": MAX_RESULT_CHARS, "partial_json": text[:MAX_RESULT_CHARS]}
         self.log.append({"tool": name, "args": args, "ok": "error" not in result, "chars": min(len(text), MAX_RESULT_CHARS)})
         return result
+
+    def deployment_facts(self, name: str) -> dict | None:
+        """One Deployment's summary for the GUARDRAILS, not the model (it isn't in SPECS, so the model can't call it).
+
+        Fetched through the same backend as the tools, so evals can record and replay it too.
+        """
+        if not re.fullmatch(NAME["pattern"], name):    # same injection rule as the tools
+            return None
+        out = self.backend("deployment_facts", {"name": name})
+        return None if "error" in out else out
+
+    def _dispatch(self, name: str, args: dict) -> dict:
+        """Answer one question from the cluster or the runbooks. Problems come back as {"error": ...}."""
+        try:
+            return getattr(self, f"_{name}")(**args)
+        except ToolError as e:
+            return {"error": str(e)}
 
     # ---------- helpers ----------
 
@@ -204,6 +227,7 @@ class Toolbox:
         rb = self.retriever.runbooks.get(id)
         if rb is None:
             raise ToolError(f"no runbook with id {id!r}; use search_runbooks to find ids")
-        if id not in self.runbooks_read:
-            self.runbooks_read.append(id)
         return {"id": rb.id, "title": rb.title, "body": rb.body}
+
+    def _deployment_facts(self, name: str) -> dict:
+        return self._get_deployment(name)

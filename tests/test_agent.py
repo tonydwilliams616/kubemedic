@@ -44,7 +44,8 @@ class ScriptedAgentModel:
     def converse_tools(self, system, messages, tools):
         self.requests.append({"system": system, "messages": json.loads(json.dumps(messages)), "tools": tools})
         turn = self.turns.pop(0) if self.turns else [call("list_pods")]
-        return turn, {"input_tokens": 1000, "output_tokens": 50}
+        # A fresh copy each time, like a real API response: scripts reuse the same turn objects.
+        return json.loads(json.dumps(turn)), {"input_tokens": 1000, "output_tokens": 50}
 
 
 def test_investigates_then_submits_a_valid_diagnosis():
@@ -129,3 +130,17 @@ def test_submit_tool_schema_is_nova_compatible():
     investigate(Toolbox(NS, kubectl()), model)
     submit = next(t for t in model.requests[0]["tools"] if t["toolSpec"]["name"] == SUBMIT)["toolSpec"]
     assert set(submit["inputSchema"]["json"]) == {"type", "properties", "required"}
+
+
+def test_a_guardrail_override_never_edits_the_models_own_answer():
+    answer = diagnosis()                       # a rollback, but only the current revision exists
+
+    class SameObjectModel:                     # hands back the very same object every time
+        model_id = "fake-model"
+
+        def converse_tools(self, system, messages, tools):
+            return [{"toolUse": {"toolUseId": "t", "name": SUBMIT, "input": answer}}], {"input_tokens": 1, "output_tokens": 1}
+
+    r = investigate(Toolbox(NS, kubectl(revisions=(2,))), SameObjectModel())
+    assert r.overridden and r.diagnosis["proposed_action"]["action"] == "escalate"
+    assert answer["proposed_action"]["action"] == "rollback"     # the original is untouched: the override made a copy
