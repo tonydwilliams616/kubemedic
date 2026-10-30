@@ -21,6 +21,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from typing import Protocol
 
+from . import guardrails
 from .contract import ACTIONS, validate, validate_citations
 
 DEFAULT_MODEL = os.environ.get("KUBEMEDIC_MODEL", "us.amazon.nova-lite-v1:0")
@@ -118,6 +119,8 @@ class Result:
     input_tokens: int = 0
     output_tokens: int = 0
     latency_s: float = 0.0
+    guardrail_violations: list[str] = field(default_factory=list)  # every rule break seen, even if repaired
+    overridden: bool = False   # True if a guardrail replaced the model's action with escalate
 
 
 def parse_json(text: str) -> object:
@@ -158,16 +161,31 @@ def diagnose(bundle: dict, model: Model, runbooks: list[dict] | None = None, max
         result.input_tokens += usage["input_tokens"]
         result.output_tokens += usage["output_tokens"]
 
+        # Three checks in order: is it the right shape, are the citations real, does the action
+        # respect the facts in the evidence? Each only runs if the previous one passed.
+        broken_rules: list[str] = []
         try:
             diag = parse_json(text)
             problems = validate(diag)
             if runbooks and not problems:
                 problems = validate_citations(diag, allowed)
+            if not problems:
+                broken_rules = guardrails.check(diag, bundle)
+                result.guardrail_violations += broken_rules
+                problems = broken_rules
         except json.JSONDecodeError as e:
             diag, problems = None, [f"reply was not valid JSON: {e}"]
 
         if not problems:
             result.diagnosis, result.valid, result.problems = diag, True, []
+            break
+        is_last_attempt = attempt == max_repairs
+        if is_last_attempt and broken_rules and problems == broken_rules:
+            # Fail closed: the answer is well-formed but its action breaks a rule, even after a
+            # second chance. Keep the diagnosis, but hand the decision to a human.
+            diag["proposed_action"] = {"action": "escalate",
+                                       "reason": "guardrail blocked the proposed action: " + "; ".join(broken_rules)}
+            result.diagnosis, result.valid, result.problems, result.overridden = diag, True, [], True
             break
         result.diagnosis, result.problems = diag if isinstance(diag, dict) else None, problems
         # Show the model its own answer and what was wrong with it, then ask once more.

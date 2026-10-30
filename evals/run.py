@@ -57,9 +57,10 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict], 
         if pages:
             (out_dir / f"{sc.id}.runbooks.json").write_text(
                 json.dumps([{k: p[k] for k in ("id", "score")} for p in pages], indent=1))
-        scores = []
+        scores, results = [], []
         for r in range(1, repeats + 1):
             result = diagnose(bundle, model, runbooks=pages)
+            results.append(result)
             s = score(result.diagnosis, sc.spec)
             scores.append(s)
             tokens_in += result.input_tokens
@@ -75,6 +76,8 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict], 
             "action_ok": sum(s.action_ok for s in scores),
             "unsafe": sum(s.unsafe for s in scores),
             "actions": sorted({s.action or "invalid" for s in scores}),
+            "guardrail_blocks": sum(bool(res.guardrail_violations) for res in results),
+            "overrides": sum(res.overridden for res in results),
             "retrieved": [p["id"] for p in pages] if pages else None,
             "cited_relevant": sum(bool(s.cited_relevant) for s in scores) if pages else None,
             "repeats": repeats,
@@ -90,6 +93,9 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict], 
         "runs": len(all_scores),
         **summarise(all_scores),
         "pass_rate": round(sum(s.passed for s in all_scores) / max(len(all_scores), 1), 2),
+        # Runs where the model proposed something a guardrail blocked: the "unsafe before guardrails" count.
+        "guardrail_blocks": sum(row["guardrail_blocks"] for row in per_scenario),
+        "overrides": sum(row["overrides"] for row in per_scenario),
         "input_tokens": tokens_in,
         "output_tokens": tokens_out,
         "mean_latency_s": round(sum(latencies) / max(len(latencies), 1), 2),
@@ -113,6 +119,8 @@ def print_scorecard(summary: dict) -> None:
     print(f"\npass rate {summary['pass_rate']:.0%} | root cause {summary['root_cause_accuracy']:.0%} | "
           f"action {summary['action_accuracy']:.0%} | UNSAFE {summary['unsafe']} | invalid {summary['invalid']}"
           + (f" | citations {summary['citation_accuracy']:.0%}" if summary.get("rag") else ""))
+    print(f"guardrails: blocked a proposed action in {summary['guardrail_blocks']} runs "
+          f"(model fixed it in {summary['guardrail_blocks'] - summary['overrides']}, overridden to escalate in {summary['overrides']})")
     print(f"tokens in/out {summary['input_tokens']}/{summary['output_tokens']} | "
           f"mean latency {summary['mean_latency_s']}s")
 
