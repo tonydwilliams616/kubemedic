@@ -1,0 +1,15 @@
+{
+  "model": "us.amazon.nova-lite-v1:0",
+  "prompt_version": "v3",
+  "rag": true,
+  "repeats": 3,
+  "recorded_at": "2026-10-30T16:15:27+0000",
+  "scenarios": [
+    "bad-image-tag",
+    "crashloop-bad-config-path",
+    "failing-readiness-probe",
+    "missing-secret",
+    "oom-killed",
+    "unschedulable-requests"
+  ]
+}

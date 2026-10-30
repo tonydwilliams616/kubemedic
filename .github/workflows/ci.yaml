@@ -24,6 +24,27 @@ jobs:
             | sudo tar xz -C /usr/local/bin kubeconform
       - run: make lint
 
+  # Replays the committed recording of real model answers through this PR's code (prompt,
+  # contract, citations, guardrails, scoring) and fails if scores drop below evals/gate.yaml.
+  # No AWS credentials, no cluster, no cost. A prompt change makes the recording stale, so the
+  # PR must also include a fresh recording (make record) that still passes the gate.
+  eval-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: make eval-replay
+      - name: Keep the replay report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-replay-report
+          path: reports/
+          if-no-files-found: ignore
+
   # Proves every scenario really breaks the way its expected.yaml says.
   # Without this the Phase 1 evals would be scoring the agent against
   # faults that might not exist.

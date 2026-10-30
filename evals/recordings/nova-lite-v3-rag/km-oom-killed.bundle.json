@@ -1,0 +1,292 @@
+{
+ "namespace": "km-oom-killed",
+ "deployments": [
+  {
+   "name": "worker",
+   "replicas": {
+    "replicas": 2,
+    "readyReplicas": 1,
+    "updatedReplicas": 1,
+    "availableReplicas": 1,
+    "desired": 1
+   },
+   "conditions": [
+    {
+     "type": "Available",
+     "status": "True",
+     "reason": "MinimumReplicasAvailable",
+     "message": "Deployment has minimum availability."
+    },
+    {
+     "type": "Progressing",
+     "status": "True",
+     "reason": "ReplicaSetUpdated",
+     "message": "ReplicaSet \"worker-5dc69c79ff\" is progressing."
+    }
+   ],
+   "containers": [
+    {
+     "name": "worker",
+     "image": "python:3.12-alpine",
+     "env": [
+      {
+       "name": "CACHE_MB",
+       "value": "200"
+      }
+     ],
+     "resources": {
+      "limits": {
+       "memory": "64Mi"
+      },
+      "requests": {
+       "cpu": "10m",
+       "memory": "64Mi"
+      }
+     },
+     "readiness_probe": null,
+     "liveness_probe": null
+    }
+   ],
+   "configmaps_used": [],
+   "rollout_history": [
+    {
+     "revision": 9,
+     "current": false,
+     "change_cause": "cache size 16MB",
+     "images": [
+      "python:3.12-alpine"
+     ],
+     "changes_from_previous": null
+    },
+    {
+     "revision": 10,
+     "current": false,
+     "change_cause": "cache size 200MB",
+     "images": [
+      "python:3.12-alpine"
+     ],
+     "changes_from_previous": [
+      "container worker: env CACHE_MB \"16\" -> \"200\""
+     ]
+    },
+    {
+     "revision": 15,
+     "current": false,
+     "change_cause": "cache size 16MB",
+     "images": [
+      "python:3.12-alpine"
+     ],
+     "changes_from_previous": [
+      "container worker: env CACHE_MB \"200\" -> \"16\""
+     ]
+    },
+    {
+     "revision": 16,
+     "current": true,
+     "change_cause": "cache size 200MB",
+     "images": [
+      "python:3.12-alpine"
+     ],
+     "changes_from_previous": [
+      "container worker: env CACHE_MB \"16\" -> \"200\""
+     ]
+    }
+   ]
+  }
+ ],
+ "pods": [
+  {
+   "name": "worker-5dc69c79ff-dtvtm",
+   "owner": "worker-5dc69c79ff",
+   "phase": "Running",
+   "ready": "0/1",
+   "containers": [
+    {
+     "name": "worker",
+     "image": "docker.io/library/python:3.12-alpine",
+     "ready": false,
+     "restarts": 2,
+     "state": {
+      "waiting": "CrashLoopBackOff",
+      "message": "back-off 20s restarting failed container=worker pod=worker-5dc69c79ff-dtvtm_km-oom-killed(9ffc8a4e-e18a-4729-a219-d42bdee8b30c)"
+     },
+     "last_terminated": {
+      "reason": "OOMKilled",
+      "exit_code": 137
+     }
+    }
+   ],
+   "problem_conditions": [
+    {
+     "type": "Ready",
+     "reason": "ContainersNotReady",
+     "message": "containers with unready status: [worker]"
+    },
+    {
+     "type": "ContainersReady",
+     "reason": "ContainersNotReady",
+     "message": "containers with unready status: [worker]"
+    }
+   ]
+  },
+  {
+   "name": "worker-c75db4fdd-885kx",
+   "owner": "worker-c75db4fdd",
+   "phase": "Running",
+   "ready": "1/1",
+   "containers": [
+    {
+     "name": "worker",
+     "image": "docker.io/library/python:3.12-alpine",
+     "ready": true,
+     "restarts": 0,
+     "state": {
+      "running": true
+     }
+    }
+   ],
+   "problem_conditions": []
+  }
+ ],
+ "events": [
+  {
+   "type": "Normal",
+   "reason": "Pulled",
+   "object": "Pod/worker-5dc69c79ff-xsqbk",
+   "count": 82,
+   "message": "Container image \"python:3.12-alpine\" already present on machine"
+  },
+  {
+   "type": "Warning",
+   "reason": "BackOff",
+   "object": "Pod/worker-5dc69c79ff-xsqbk",
+   "count": 1341,
+   "message": "Back-off restarting failed container worker in pod worker-5dc69c79ff-xsqbk_km-oom-killed(af6cddcc-89c3-4f62-8653-86770889bfcc)"
+  },
+  {
+   "type": "Normal",
+   "reason": "Scheduled",
+   "object": "Pod/worker-c75db4fdd-885kx",
+   "count": 1,
+   "message": "Successfully assigned km-oom-killed/worker-c75db4fdd-885kx to kubemedic-worker"
+  },
+  {
+   "type": "Normal",
+   "reason": "Pulled",
+   "object": "Pod/worker-c75db4fdd-885kx",
+   "count": 1,
+   "message": "Container image \"python:3.12-alpine\" already present on machine"
+  },
+  {
+   "type": "Normal",
+   "reason": "Created",
+   "object": "Pod/worker-c75db4fdd-885kx",
+   "count": 1,
+   "message": "Created container worker"
+  },
+  {
+   "type": "Normal",
+   "reason": "Started",
+   "object": "Pod/worker-c75db4fdd-885kx",
+   "count": 1,
+   "message": "Started container worker"
+  },
+  {
+   "type": "Normal",
+   "reason": "SuccessfulCreate",
+   "object": "ReplicaSet/worker-c75db4fdd",
+   "count": 1,
+   "message": "Created pod: worker-c75db4fdd-885kx"
+  },
+  {
+   "type": "Normal",
+   "reason": "ScalingReplicaSet",
+   "object": "Deployment/worker",
+   "count": 2,
+   "message": "Scaled up replica set worker-c75db4fdd to 1 from 0"
+  },
+  {
+   "type": "Normal",
+   "reason": "Scheduled",
+   "object": "Pod/worker-5dc69c79ff-dtvtm",
+   "count": 1,
+   "message": "Successfully assigned km-oom-killed/worker-5dc69c79ff-dtvtm to kubemedic-worker"
+  },
+  {
+   "type": "Normal",
+   "reason": "SuccessfulDelete",
+   "object": "ReplicaSet/worker-5dc69c79ff",
+   "count": 1,
+   "message": "Deleted pod: worker-5dc69c79ff-xsqbk"
+  },
+  {
+   "type": "Normal",
+   "reason": "SuccessfulCreate",
+   "object": "ReplicaSet/worker-5dc69c79ff",
+   "count": 1,
+   "message": "Created pod: worker-5dc69c79ff-dtvtm"
+  },
+  {
+   "type": "Normal",
+   "reason": "ScalingReplicaSet",
+   "object": "Deployment/worker",
+   "count": 2,
+   "message": "Scaled down replica set worker-5dc69c79ff to 0 from 1"
+  },
+  {
+   "type": "Normal",
+   "reason": "ScalingReplicaSet",
+   "object": "Deployment/worker",
+   "count": 2,
+   "message": "Scaled up replica set worker-5dc69c79ff to 1 from 0"
+  },
+  {
+   "type": "Normal",
+   "reason": "Pulled",
+   "object": "Pod/worker-5dc69c79ff-dtvtm",
+   "count": 3,
+   "message": "Container image \"python:3.12-alpine\" already present on machine"
+  },
+  {
+   "type": "Normal",
+   "reason": "Created",
+   "object": "Pod/worker-5dc69c79ff-dtvtm",
+   "count": 3,
+   "message": "Created container worker"
+  },
+  {
+   "type": "Normal",
+   "reason": "Started",
+   "object": "Pod/worker-5dc69c79ff-dtvtm",
+   "count": 3,
+   "message": "Started container worker"
+  },
+  {
+   "type": "Warning",
+   "reason": "BackOff",
+   "object": "Pod/worker-5dc69c79ff-dtvtm",
+   "count": 3,
+   "message": "Back-off restarting failed container worker in pod worker-5dc69c79ff-dtvtm_km-oom-killed(9ffc8a4e-e18a-4729-a219-d42bdee8b30c)"
+  }
+ ],
+ "configmaps": [],
+ "logs": [
+  {
+   "pod": "worker-5dc69c79ff-dtvtm",
+   "container": "worker",
+   "previous": false,
+   "ok": true,
+   "redactions": 0,
+   "text": ""
+  },
+  {
+   "pod": "worker-5dc69c79ff-dtvtm",
+   "container": "worker",
+   "previous": true,
+   "ok": true,
+   "redactions": 0,
+   "text": ""
+  }
+ ],
+ "errors": []
+}

@@ -1,0 +1,14 @@
+[
+ {
+  "id": "image-pull-errors",
+  "score": 0.622
+ },
+ {
+  "id": "readiness-probe-failing",
+  "score": 0.369
+ },
+ {
+  "id": "crashloopbackoff",
+  "score": 0.312
+ }
+]

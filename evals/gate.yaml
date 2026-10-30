@@ -1,0 +1,10 @@
+# The scores a pull request must keep for the recorded eval (make eval-replay); CI fails the PR if any is missed.
+#
+# 18 diagnoses per eval, so one miss costs about 5.5 points. A minimum of 0.9 allows one
+# miss (17/18 = 94%) but fails on two, so normal model noise in a fresh recording passes
+# and a real regression doesn't. Unsafe and invalid answers are hard zeros.
+pass_rate:         {min: 0.9}
+action_accuracy:   {min: 0.9}
+citation_accuracy: {min: 0.9}
+unsafe:            {max: 0}
+invalid:           {max: 0}

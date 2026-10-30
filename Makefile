@@ -7,9 +7,10 @@ CONTEXT  := kind-$(CLUSTER)
 SCENARIO ?=
 REPEATS  ?= 3
 RAG      ?=
+RECORDING ?= evals/recordings/nova-lite-v3-rag
 LAB      := $(PYTHON) -m lab --context $(CONTEXT)
 
-.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose eval eval-retrieval tracking-setup mlflow-ui track-reports validate test lint
+.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose eval eval-retrieval record eval-replay tracking-setup mlflow-ui track-reports validate test lint
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
@@ -67,6 +68,12 @@ eval: ## Score the diagnoser on every broken scenario: make eval [MODEL=<id>] [R
 
 eval-retrieval: ## Score runbook search alone (no LLM) on every broken scenario
 	$(PYTHON) -m evals.retrieval --context $(CONTEXT)
+
+record: ## Run the real RAG eval and save every model answer for CI to replay: make record [MODEL=<id>]
+	$(PYTHON) -m evals.run --context $(CONTEXT) --repeats $(REPEATS) --rag $(if $(MODEL),--model $(MODEL)) --record $(RECORDING)
+
+eval-replay: ## Re-score the recorded answers through today's code and apply the merge gate (no AWS, no cluster)
+	$(PYTHON) -m evals.run --replay $(RECORDING) --gate evals/gate.yaml
 
 tracking-setup: ## Install MLflow (optional) so every eval run is logged to .mlflow/
 	$(PYTHON) -m pip install -r requirements-tracking.txt

@@ -1,0 +1,229 @@
+{
+ "namespace": "km-bad-image-tag",
+ "deployments": [
+  {
+   "name": "web",
+   "replicas": {
+    "replicas": 3,
+    "readyReplicas": 2,
+    "updatedReplicas": 1,
+    "availableReplicas": 2,
+    "desired": 2
+   },
+   "conditions": [
+    {
+     "type": "Available",
+     "status": "True",
+     "reason": "MinimumReplicasAvailable",
+     "message": "Deployment has minimum availability."
+    },
+    {
+     "type": "Progressing",
+     "status": "True",
+     "reason": "ReplicaSetUpdated",
+     "message": "ReplicaSet \"web-6679475cb5\" is progressing."
+    }
+   ],
+   "containers": [
+    {
+     "name": "web",
+     "image": "nginx:1.27.99-alpine",
+     "env": [],
+     "resources": {
+      "limits": {
+       "memory": "64Mi"
+      },
+      "requests": {
+       "cpu": "10m",
+       "memory": "16Mi"
+      }
+     },
+     "readiness_probe": null,
+     "liveness_probe": null
+    }
+   ],
+   "configmaps_used": [],
+   "rollout_history": [
+    {
+     "revision": 11,
+     "current": false,
+     "change_cause": "release 1.4.0",
+     "images": [
+      "nginx:1.27-alpine"
+     ],
+     "changes_from_previous": null
+    },
+    {
+     "revision": 12,
+     "current": true,
+     "change_cause": "release 1.5.0",
+     "images": [
+      "nginx:1.27.99-alpine"
+     ],
+     "changes_from_previous": [
+      "container web: image \"nginx:1.27-alpine\" -> \"nginx:1.27.99-alpine\""
+     ]
+    }
+   ]
+  }
+ ],
+ "pods": [
+  {
+   "name": "web-656997fcd9-bpwj8",
+   "owner": "web-656997fcd9",
+   "phase": "Running",
+   "ready": "1/1",
+   "containers": [
+    {
+     "name": "web",
+     "image": "docker.io/library/nginx:1.27-alpine",
+     "ready": true,
+     "restarts": 0,
+     "state": {
+      "running": true
+     }
+    }
+   ],
+   "problem_conditions": []
+  },
+  {
+   "name": "web-656997fcd9-r4fmk",
+   "owner": "web-656997fcd9",
+   "phase": "Running",
+   "ready": "1/1",
+   "containers": [
+    {
+     "name": "web",
+     "image": "docker.io/library/nginx:1.27-alpine",
+     "ready": true,
+     "restarts": 0,
+     "state": {
+      "running": true
+     }
+    }
+   ],
+   "problem_conditions": []
+  },
+  {
+   "name": "web-6679475cb5-9kv5r",
+   "owner": "web-6679475cb5",
+   "phase": "Pending",
+   "ready": "0/1",
+   "containers": [
+    {
+     "name": "web",
+     "image": "nginx:1.27.99-alpine",
+     "ready": false,
+     "restarts": 0,
+     "state": {
+      "waiting": "ErrImagePull",
+      "message": "rpc error: code = NotFound desc = failed to pull and unpack image \"docker.io/library/nginx:1.27.99-alpine\": failed to resolve reference \"docker.io/library/nginx:1.27.99-alpine\": docker.io/library/nginx:1.27.99-alpine: not found"
+     }
+    }
+   ],
+   "problem_conditions": [
+    {
+     "type": "Ready",
+     "reason": "ContainersNotReady",
+     "message": "containers with unready status: [web]"
+    },
+    {
+     "type": "ContainersReady",
+     "reason": "ContainersNotReady",
+     "message": "containers with unready status: [web]"
+    }
+   ]
+  }
+ ],
+ "events": [
+  {
+   "type": "Normal",
+   "reason": "BackOff",
+   "object": "Pod/web-6679475cb5-cgmrr",
+   "count": 1275,
+   "message": "Back-off pulling image \"nginx:1.27.99-alpine\""
+  },
+  {
+   "type": "Normal",
+   "reason": "Scheduled",
+   "object": "Pod/web-6679475cb5-9kv5r",
+   "count": 1,
+   "message": "Successfully assigned km-bad-image-tag/web-6679475cb5-9kv5r to kubemedic-worker"
+  },
+  {
+   "type": "Normal",
+   "reason": "Pulling",
+   "object": "Pod/web-6679475cb5-9kv5r",
+   "count": 1,
+   "message": "Pulling image \"nginx:1.27.99-alpine\""
+  },
+  {
+   "type": "Normal",
+   "reason": "SuccessfulDelete",
+   "object": "ReplicaSet/web-6679475cb5",
+   "count": 1,
+   "message": "Deleted pod: web-6679475cb5-cgmrr"
+  },
+  {
+   "type": "Normal",
+   "reason": "SuccessfulCreate",
+   "object": "ReplicaSet/web-6679475cb5",
+   "count": 1,
+   "message": "Created pod: web-6679475cb5-9kv5r"
+  },
+  {
+   "type": "Normal",
+   "reason": "ScalingReplicaSet",
+   "object": "Deployment/web",
+   "count": 5,
+   "message": "Scaled down replica set web-6679475cb5 to 0 from 1"
+  },
+  {
+   "type": "Normal",
+   "reason": "ScalingReplicaSet",
+   "object": "Deployment/web",
+   "count": 5,
+   "message": "Scaled up replica set web-6679475cb5 to 1 from 0"
+  },
+  {
+   "type": "Warning",
+   "reason": "Failed",
+   "object": "Pod/web-6679475cb5-9kv5r",
+   "count": 1,
+   "message": "Failed to pull image \"nginx:1.27.99-alpine\": rpc error: code = NotFound desc = failed to pull and unpack image \"docker.io/library/nginx:1.27.99-alpine\": failed to resolve reference \"docker.io/library/nginx:1.27.99-alpine\": docker.io/library/nginx:1.27.99-alpine: not found"
+  },
+  {
+   "type": "Warning",
+   "reason": "Failed",
+   "object": "Pod/web-6679475cb5-9kv5r",
+   "count": 1,
+   "message": "Error: ErrImagePull"
+  },
+  {
+   "type": "Normal",
+   "reason": "BackOff",
+   "object": "Pod/web-6679475cb5-9kv5r",
+   "count": 1,
+   "message": "Back-off pulling image \"nginx:1.27.99-alpine\""
+  },
+  {
+   "type": "Warning",
+   "reason": "Failed",
+   "object": "Pod/web-6679475cb5-9kv5r",
+   "count": 1,
+   "message": "Error: ImagePullBackOff"
+  }
+ ],
+ "configmaps": [],
+ "logs": [
+  {
+   "pod": "web-6679475cb5-9kv5r",
+   "container": "web",
+   "previous": false,
+   "ok": false,
+   "redactions": 0,
+   "text": "Error from server (BadRequest): container \"web\" in pod \"web-6679475cb5-9kv5r\" is waiting to start: image can't be pulled"
+  }
+ ],
+ "errors": []
+}

@@ -1,0 +1,273 @@
+{
+ "namespace": "km-crashloop-bad-config-path",
+ "deployments": [
+  {
+   "name": "api",
+   "replicas": {
+    "replicas": 2,
+    "readyReplicas": 1,
+    "updatedReplicas": 1,
+    "availableReplicas": 1,
+    "desired": 1
+   },
+   "conditions": [
+    {
+     "type": "Available",
+     "status": "True",
+     "reason": "MinimumReplicasAvailable",
+     "message": "Deployment has minimum availability."
+    },
+    {
+     "type": "Progressing",
+     "status": "True",
+     "reason": "ReplicaSetUpdated",
+     "message": "ReplicaSet \"api-6bb856d98c\" is progressing."
+    }
+   ],
+   "containers": [
+    {
+     "name": "api",
+     "image": "busybox:1.36",
+     "env": [
+      {
+       "name": "CONFIG_PATH",
+       "value": "/etc/app/settings.yaml"
+      }
+     ],
+     "resources": {
+      "limits": {
+       "memory": "32Mi"
+      },
+      "requests": {
+       "cpu": "10m",
+       "memory": "16Mi"
+      }
+     },
+     "readiness_probe": null,
+     "liveness_probe": null
+    }
+   ],
+   "configmaps_used": [
+    "api-config"
+   ],
+   "rollout_history": [
+    {
+     "revision": 11,
+     "current": false,
+     "change_cause": "release 2.3.0",
+     "images": [
+      "busybox:1.36"
+     ],
+     "changes_from_previous": null
+    },
+    {
+     "revision": 12,
+     "current": true,
+     "change_cause": "release 2.4.0",
+     "images": [
+      "busybox:1.36"
+     ],
+     "changes_from_previous": [
+      "container api: env CONFIG_PATH \"/etc/app/config.yaml\" -> \"/etc/app/settings.yaml\""
+     ]
+    }
+   ]
+  }
+ ],
+ "pods": [
+  {
+   "name": "api-69d7576d88-fntht",
+   "owner": "api-69d7576d88",
+   "phase": "Running",
+   "ready": "1/1",
+   "containers": [
+    {
+     "name": "api",
+     "image": "docker.io/library/busybox:1.36",
+     "ready": true,
+     "restarts": 0,
+     "state": {
+      "running": true
+     }
+    }
+   ],
+   "problem_conditions": []
+  },
+  {
+   "name": "api-6bb856d98c-v4mjh",
+   "owner": "api-6bb856d98c",
+   "phase": "Running",
+   "ready": "0/1",
+   "containers": [
+    {
+     "name": "api",
+     "image": "docker.io/library/busybox:1.36",
+     "ready": false,
+     "restarts": 2,
+     "state": {
+      "terminated": "Error",
+      "message": null,
+      "exit_code": 1
+     },
+     "last_terminated": {
+      "reason": "Error",
+      "exit_code": 1
+     }
+    }
+   ],
+   "problem_conditions": [
+    {
+     "type": "Ready",
+     "reason": "ContainersNotReady",
+     "message": "containers with unready status: [api]"
+    },
+    {
+     "type": "ContainersReady",
+     "reason": "ContainersNotReady",
+     "message": "containers with unready status: [api]"
+    }
+   ]
+  }
+ ],
+ "events": [
+  {
+   "type": "Warning",
+   "reason": "BackOff",
+   "object": "Pod/api-6bb856d98c-pkln5",
+   "count": 1337,
+   "message": "Back-off restarting failed container api in pod api-6bb856d98c-pkln5_km-crashloop-bad-config-path(86203745-85f0-48da-adae-7fb1c7b568c9)"
+  },
+  {
+   "type": "Normal",
+   "reason": "Scheduled",
+   "object": "Pod/api-69d7576d88-fntht",
+   "count": 1,
+   "message": "Successfully assigned km-crashloop-bad-config-path/api-69d7576d88-fntht to kubemedic-worker"
+  },
+  {
+   "type": "Normal",
+   "reason": "SuccessfulCreate",
+   "object": "ReplicaSet/api-69d7576d88",
+   "count": 1,
+   "message": "Created pod: api-69d7576d88-fntht"
+  },
+  {
+   "type": "Normal",
+   "reason": "ScalingReplicaSet",
+   "object": "Deployment/api",
+   "count": 3,
+   "message": "Scaled up replica set api-69d7576d88 to 1 from 0"
+  },
+  {
+   "type": "Normal",
+   "reason": "Pulled",
+   "object": "Pod/api-69d7576d88-fntht",
+   "count": 1,
+   "message": "Container image \"busybox:1.36\" already present on machine"
+  },
+  {
+   "type": "Normal",
+   "reason": "Created",
+   "object": "Pod/api-69d7576d88-fntht",
+   "count": 1,
+   "message": "Created container api"
+  },
+  {
+   "type": "Normal",
+   "reason": "Started",
+   "object": "Pod/api-69d7576d88-fntht",
+   "count": 1,
+   "message": "Started container api"
+  },
+  {
+   "type": "Normal",
+   "reason": "Scheduled",
+   "object": "Pod/api-6bb856d98c-v4mjh",
+   "count": 1,
+   "message": "Successfully assigned km-crashloop-bad-config-path/api-6bb856d98c-v4mjh to kubemedic-worker"
+  },
+  {
+   "type": "Normal",
+   "reason": "SuccessfulDelete",
+   "object": "ReplicaSet/api-6bb856d98c",
+   "count": 1,
+   "message": "Deleted pod: api-6bb856d98c-pkln5"
+  },
+  {
+   "type": "Normal",
+   "reason": "SuccessfulCreate",
+   "object": "ReplicaSet/api-6bb856d98c",
+   "count": 1,
+   "message": "Created pod: api-6bb856d98c-v4mjh"
+  },
+  {
+   "type": "Normal",
+   "reason": "ScalingReplicaSet",
+   "object": "Deployment/api",
+   "count": 5,
+   "message": "Scaled down replica set api-6bb856d98c to 0 from 1"
+  },
+  {
+   "type": "Normal",
+   "reason": "ScalingReplicaSet",
+   "object": "Deployment/api",
+   "count": 5,
+   "message": "Scaled up replica set api-6bb856d98c to 1 from 0"
+  },
+  {
+   "type": "Normal",
+   "reason": "Pulled",
+   "object": "Pod/api-6bb856d98c-v4mjh",
+   "count": 3,
+   "message": "Container image \"busybox:1.36\" already present on machine"
+  },
+  {
+   "type": "Normal",
+   "reason": "Created",
+   "object": "Pod/api-6bb856d98c-v4mjh",
+   "count": 3,
+   "message": "Created container api"
+  },
+  {
+   "type": "Normal",
+   "reason": "Started",
+   "object": "Pod/api-6bb856d98c-v4mjh",
+   "count": 3,
+   "message": "Started container api"
+  },
+  {
+   "type": "Warning",
+   "reason": "BackOff",
+   "object": "Pod/api-6bb856d98c-v4mjh",
+   "count": 2,
+   "message": "Back-off restarting failed container api in pod api-6bb856d98c-v4mjh_km-crashloop-bad-config-path(2e675f10-cd6f-469c-8b11-b208ad539aa1)"
+  }
+ ],
+ "configmaps": [
+  {
+   "name": "api-config",
+   "keys": [
+    "config.yaml"
+   ]
+  }
+ ],
+ "logs": [
+  {
+   "pod": "api-6bb856d98c-v4mjh",
+   "container": "api",
+   "previous": false,
+   "ok": true,
+   "redactions": 0,
+   "text": "FATAL: config file /etc/app/settings.yaml not found\n"
+  },
+  {
+   "pod": "api-6bb856d98c-v4mjh",
+   "container": "api",
+   "previous": true,
+   "ok": true,
+   "redactions": 0,
+   "text": "unable to retrieve container logs for containerd://eb737d85cabbbe5e87648fedf0d2fadf30fc35f1e59f7415d6bc3c8baad1f97e"
+  }
+ ],
+ "errors": []
+}
