@@ -42,7 +42,7 @@ def replay(rec_dir, tmp, repeats=2, scenario=OOM):
 
 def test_agent_is_scored_with_steps_and_model_vs_system_accuracy():
     summary, _ = record(Path(tempfile.mkdtemp()), SCRIPT * 2)
-    assert summary["mode"] == "agent" and summary["prompt_version"] == "a1" and summary["pass_rate"] == 1.0
+    assert summary["mode"] == "agent" and summary["prompt_version"] == "a2" and summary["pass_rate"] == 1.0
     assert summary["mean_steps"] == 3 and summary["mean_tool_calls"] == 2 and summary["budget_exhausted"] == 0
     assert summary["model_action_accuracy"] == 1.0 and summary["per_scenario"][0]["mean_steps"] == 3
 

@@ -41,8 +41,9 @@ class ScriptedAgentModel:
     def __init__(self, *turns):
         self.turns, self.requests = list(turns), []
 
-    def converse_tools(self, system, messages, tools):
-        self.requests.append({"system": system, "messages": json.loads(json.dumps(messages)), "tools": tools})
+    def converse_tools(self, system, messages, tools, force_tool=None):
+        self.requests.append({"system": system, "messages": json.loads(json.dumps(messages)), "tools": tools,
+                              "force_tool": force_tool})
         turn = self.turns.pop(0) if self.turns else [call("list_pods")]
         # A fresh copy each time, like a real API response: scripts reuse the same turn objects.
         return json.loads(json.dumps(turn)), {"input_tokens": 1000, "output_tokens": 50}
@@ -56,7 +57,7 @@ def test_investigates_then_submits_a_valid_diagnosis():
     r = investigate(Toolbox(NS, kubectl()), model)
     assert r.valid and r.diagnosis["proposed_action"]["action"] == "rollback"
     assert r.steps == 3 and [c["tool"] for c in r.tool_calls] == ["list_deployments", "get_deployment", "list_pods"]
-    assert r.input_tokens == 3000 and r.prompt_version == "a1"
+    assert r.input_tokens == 3000 and r.prompt_version == "a2"
     assert "start with deployments" in r.trace[0]["thinking"]
 
 
@@ -119,7 +120,7 @@ def test_with_runbooks_it_may_only_cite_pages_it_read():
                                [call("read_runbook", {"id": "oomkilled"})],
                                [call(SUBMIT, diagnosis(citations=["oomkilled"]))])
     r = investigate(Toolbox(NS, kubectl(), Retriever()), model)
-    assert r.valid and r.prompt_version == "a1-rag" and r.diagnosis["citations"] == ["oomkilled"]
+    assert r.valid and r.prompt_version == "a2-rag" and r.diagnosis["citations"] == ["oomkilled"]
     first_rejection = model.requests[1]["messages"][-1]["content"][0]["toolResult"]["content"][0]["json"]["error"]
     assert "runbooks you have read: none" in first_rejection
     assert any(t["toolSpec"]["name"] == "read_runbook" for t in model.requests[0]["tools"])
@@ -138,9 +139,45 @@ def test_a_guardrail_override_never_edits_the_models_own_answer():
     class SameObjectModel:                     # hands back the very same object every time
         model_id = "fake-model"
 
-        def converse_tools(self, system, messages, tools):
+        def converse_tools(self, system, messages, tools, force_tool=None):
             return [{"toolUse": {"toolUseId": "t", "name": SUBMIT, "input": answer}}], {"input_tokens": 1, "output_tokens": 1}
 
     r = investigate(Toolbox(NS, kubectl(revisions=(2,))), SameObjectModel())
     assert r.overridden and r.diagnosis["proposed_action"]["action"] == "escalate"
     assert answer["proposed_action"]["action"] == "rollback"     # the original is untouched: the override made a copy
+
+
+# ---------- a2 fixes for the looping seen in the a1 evals ----------
+
+def test_the_agent_is_told_its_step_budget_every_step():
+    model = ScriptedAgentModel([call("list_pods")], [call(SUBMIT, diagnosis())])
+    investigate(Toolbox(NS, kubectl()), model, max_steps=5)
+    assert "step 1 of 5 (4 left" in model.requests[0]["system"] and "step 2 of 5" in model.requests[1]["system"]
+    assert "LAST step" not in model.requests[1]["system"]
+
+
+def test_the_last_step_forces_a_submission():
+    class Complies(ScriptedAgentModel):          # like Bedrock: a forced tool is always the one called
+        def converse_tools(self, system, messages, tools, force_tool=None):
+            content, usage = super().converse_tools(system, messages, tools, force_tool)
+            return ([call(SUBMIT, diagnosis())] if force_tool else content), usage
+
+    model = Complies()                           # would otherwise call list_pods forever
+    r = investigate(Toolbox(NS, kubectl()), model, max_steps=4)
+    assert [q["force_tool"] for q in model.requests] == [None, None, None, SUBMIT]
+    assert "LAST step" in model.requests[-1]["system"] and r.valid and r.steps == 4
+
+
+def test_a_repeated_question_is_answered_without_running_it_again():
+    model = ScriptedAgentModel([call("list_pods")], [call("list_pods")], [call(SUBMIT, diagnosis())])
+    r = investigate(Toolbox(NS, kubectl()), model)
+    assert [c["tool"] for c in r.tool_calls] == ["list_pods"] and r.repeated_calls == 1
+    note = model.requests[2]["messages"][-1]["content"][0]["toolResult"]["content"][0]["json"]["note"]
+    assert "already called list_pods" in note and "at step 1" in note
+
+
+def test_the_same_tool_with_different_arguments_is_not_a_repeat():
+    model = ScriptedAgentModel([call("get_logs", {"pod": "worker-abc"})],
+                               [call("get_logs", {"pod": "worker-abc", "previous": True})], [call(SUBMIT, diagnosis())])
+    r = investigate(Toolbox(NS, kubectl()), model)
+    assert len(r.tool_calls) == 2 and r.repeated_calls == 0

@@ -109,11 +109,13 @@ class BedrockModel:
         usage = resp.get("usage", {})
         return text, {"input_tokens": usage.get("inputTokens", 0), "output_tokens": usage.get("outputTokens", 0)}
 
-    def converse_tools(self, system: str, messages: list[dict], tools: list[dict]) -> tuple[list[dict], dict]:
+    def converse_tools(self, system: str, messages: list[dict], tools: list[dict],
+                       force_tool: str | None = None) -> tuple[list[dict], dict]:
         """One agent step: the model may answer with tool calls. Returns (content blocks, token usage).
 
         toolChoice "any" means every reply must call a tool, so the model can't drift into chat;
-        it finishes by calling submit_diagnosis. Nova calls tools most reliably with greedy
+        it finishes by calling submit_diagnosis. force_tool requires that ONE tool (used on the
+        agent's last step, so it always answers). Nova calls tools most reliably with greedy
         decoding (temperature 0 and topK 1), per AWS's Nova tool-use troubleshooting guide.
         """
         extra = {"additionalModelRequestFields": {"inferenceConfig": {"topK": 1}}} if "nova" in self.model_id else {}
@@ -121,7 +123,8 @@ class BedrockModel:
             modelId=self.model_id,
             system=[{"text": system}],
             messages=messages,
-            toolConfig={"tools": tools, "toolChoice": {"any": {}}},
+            toolConfig={"tools": tools,
+                        "toolChoice": {"tool": {"name": force_tool}} if force_tool else {"any": {}}},
             inferenceConfig={"maxTokens": AGENT_MAX_OUTPUT_TOKENS, "temperature": 0},
             **extra,
         )
@@ -146,6 +149,7 @@ class Result:
     steps: int = 0                                             # agent only: model calls made
     tool_calls: list[dict] = field(default_factory=list)      # agent only: every tool call, in order
     trace: list[dict] = field(default_factory=list)           # agent only: what it thought and did, step by step
+    repeated_calls: int = 0                                     # agent only: repeated questions answered "already asked"
 
 
 def parse_json(text: str) -> object:

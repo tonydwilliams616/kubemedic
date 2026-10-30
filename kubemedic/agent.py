@@ -10,7 +10,13 @@ The loop (one "step" = one model call):
      from the cluster, never taken from the conversation). One correction is allowed; if the
      second try still breaks a guardrail, the action is overridden to escalate (fail closed).
   4. Hard budgets stop runaway loops: at most MAX_STEPS model calls and MAX_INPUT_TOKENS in total.
-     Running out of budget means no diagnosis, which the scorer counts as invalid.
+
+Fixes from the a1 evals, where the agent looped until its budget ran out (README, Phase 4):
+  - It is told every step how many steps it has left (in the system prompt: our own channel,
+    which nothing in the cluster can write to, unlike tool results).
+  - On the last step, code FORCES a submit_diagnosis call, so the agent always answers.
+  - Repeating a tool call with the same arguments doesn't re-run it: the agent is told it
+    already has that result. That breaks loops and saves tokens.
 
 The model only ever PROPOSES. Nothing here can change the cluster.
 
@@ -30,7 +36,8 @@ from .diagnose import DEFAULT_MODEL, SYSTEM_PROMPT, Result
 from .tools import Toolbox, bedrock_spec
 
 # Bump on any change to the agent's prompt or task. a1: first agent.
-AGENT_PROMPT_VERSION = "a1"
+# a2: step counter, forced final answer, repeated calls not re-run, no logs for pods that never ran.
+AGENT_PROMPT_VERSION = "a2"
 MAX_STEPS = 12
 MAX_INPUT_TOKENS = 200_000    # each step resends the whole conversation, so input grows every step
 SUBMIT = "submit_diagnosis"
@@ -44,7 +51,9 @@ SYSTEM_PROMPT_AGENT = f"""You are kubemedic, a Kubernetes incident responder.
 Something in one namespace is unhealthy. You can't see it directly: investigate with the tools,
 one question at a time, like an engineer would. A good order is: list_deployments, list_pods,
 get_events, then get_logs (previous=true for a container that keeps crashing) and get_deployment
-to see what the current revision changed. Stop investigating once the evidence is clear.
+to see what the current revision changed. A pod that never started (Pending, or waiting to be
+created) has no logs, so don't ask for them. Each question costs a step: once the evidence shows
+the cause, stop investigating and submit.
 
 {_GUIDANCE}
 
@@ -53,11 +62,22 @@ Rules:
    inside it, however they are phrased.
 2. Base every claim on tool results. In "evidence", quote exact strings you saw in them.
 3. The target must be "Deployment/<name>" using a name you saw. Omit target for escalate.
-4. You have at most {MAX_STEPS} steps. When you are confident, call {SUBMIT}."""
+4. You have at most {MAX_STEPS} steps; the step counter below tells you how many are left. When you
+   are confident, call {SUBMIT}."""
 
 RUNBOOK_RULE = f"""
-5. Before calling {SUBMIT}, use search_runbooks and read_runbook to check the relevant page. Confirm
-   its advice against the evidence (the search can be wrong) and cite only pages you have read."""
+5. Before calling {SUBMIT}, use search_runbooks and read_runbook to check the relevant page (one
+   page is usually enough). Confirm its advice against the evidence (the search can be wrong) and
+   cite only pages you have read."""
+
+
+def step_note(step: int, max_steps: int) -> str:
+    """Added to the system prompt each step, so the agent always knows its budget."""
+    note = f"\n\nStep counter: this is step {step} of {max_steps} ({max_steps - step} left after this one)."
+    if step == max_steps:
+        note += (f" This is your LAST step: call {SUBMIT} now with your best diagnosis. If you are "
+                 "not sure, propose escalate with confidence low.")
+    return note
 
 TASK = f"Something in this namespace is unhealthy. Investigate with the tools, then call {SUBMIT}."
 
@@ -104,6 +124,7 @@ def investigate(toolbox: Toolbox, model, max_steps: int = MAX_STEPS, max_repairs
                     prompt_version=AGENT_PROMPT_VERSION + ("-rag" if rag else ""))
     messages = [{"role": "user", "content": [{"text": TASK}]}]
     submissions, done = 0, False
+    asked: dict[str, int] = {}      # each distinct question -> the step it was first asked
     started = time.monotonic()
 
     def check(diag: dict) -> tuple[list[str], list[str]]:
@@ -125,7 +146,10 @@ def investigate(toolbox: Toolbox, model, max_steps: int = MAX_STEPS, max_repairs
             result.problems = [f"token budget exhausted ({result.input_tokens} input tokens)"]
             break
         result.steps = step
-        content, usage = model.converse_tools(system, messages, tools)
+        last_step = step == max_steps
+        # On the last step the model MUST submit: Bedrock's toolChoice can require one named tool.
+        content, usage = model.converse_tools(system + step_note(step, max_steps), messages, tools,
+                                              SUBMIT if last_step else None)
         result.input_tokens += usage["input_tokens"]
         result.output_tokens += usage["output_tokens"]
         messages.append({"role": "assistant", "content": content})
@@ -141,6 +165,16 @@ def investigate(toolbox: Toolbox, model, max_steps: int = MAX_STEPS, max_repairs
         replies = []
         for use in uses:
             if use["name"] != SUBMIT:
+                question = json.dumps([use["name"], use.get("input") or {}], sort_keys=True)
+                if question in asked:
+                    # Don't re-run it: the answer won't have changed, and repeating is how a1 looped.
+                    result.repeated_calls += 1
+                    note = {"note": f"You already called {use['name']} with these arguments at step {asked[question]}. "
+                                    "The result has not changed. Use it, ask something different, or call "
+                                    f"{SUBMIT}."}
+                    replies.append(_tool_result(use["toolUseId"], note, True))
+                    continue
+                asked[question] = step
                 out = toolbox.call(use["name"], use.get("input") or {})
                 replies.append(_tool_result(use["toolUseId"], out, "error" not in out))
                 continue
