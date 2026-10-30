@@ -101,3 +101,11 @@ def test_query_keeps_failure_signals_and_drops_noise():
     assert "log: worker started, cache=200MB" in q and "log: line1" not in q   # only the last 5 log lines
     assert "Successfully pulled image" not in q and "running" not in q          # healthy noise dropped
     assert q.count("Back-off restarting failed container") == 1                 # duplicates removed
+
+
+def test_retriever_returns_full_pages_best_first():
+    from kubemedic.retrieve import Retriever
+    r = Retriever(WordEmbedder(), PAGES)
+    bundle = {"pods": [{"containers": [{"state": {}, "last_terminated": {"reason": "OOMKilled", "exit_code": 137}}]}]}
+    top = r.top_runbooks(bundle, k=2)
+    assert top[0]["id"] == "memory" and "memory limit" in top[0]["body"] and len(top) == 2

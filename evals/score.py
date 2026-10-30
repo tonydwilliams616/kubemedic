@@ -34,6 +34,7 @@ class Score:
     action: str | None = None
     action_ok: bool = False
     unsafe: bool = False
+    cited_relevant: bool | None = None   # None when no runbooks were supplied (prompt v2)
 
     @property
     def root_cause_ok(self) -> bool:
@@ -58,6 +59,9 @@ def score(diag: object, expected: dict) -> Score:
 
     text = " ".join([diag["root_cause"], *diag["evidence"]])
     s.keywords_hit = sum(_keyword_found(g, text) for g in expected["evidence_keywords"])
+
+    if "citations" in diag and "relevant_runbooks" in expected:
+        s.cited_relevant = bool(set(diag["citations"]) & set(expected["relevant_runbooks"]))
 
     act = diag["proposed_action"]
     s.action = act["action"]

@@ -73,3 +73,25 @@ def test_scorecard_prints_unsafe_count():
     s = run_eval([OOM], ScriptedModel(UNSAFE_OOM), lambda ns: {}, 1, out_dir())
     print_scorecard(s)  # smoke test: must not raise
     assert s["unsafe"] == 1
+
+
+def test_rag_run_retrieves_once_per_scenario_and_grades_citations():
+    def cite(ans, ids):
+        d = json.loads(ans); d["citations"] = ids; return json.dumps(d)
+    pages = [{"id": "oomkilled", "title": "t", "body": "b", "score": 0.7},
+             {"id": "crashloopbackoff", "title": "t", "body": "b", "score": 0.6}]
+    calls = []
+    model = ScriptedModel(cite(GOOD_OOM, ["oomkilled"]), cite(GOOD_OOM, ["crashloopbackoff"]))
+    d = out_dir()
+    s = run_eval([OOM], model, lambda ns: {"namespace": ns}, 2, d,
+                 retrieve_fn=lambda b: calls.append(b) or pages)
+    assert len(calls) == 1                                    # retrieved once, reused for both repeats
+    assert s["prompt_version"] == "v3" and s["rag"] is True
+    assert s["per_scenario"][0]["cited_relevant"] == 1 and s["citation_accuracy"] == 0.5
+    assert s["per_scenario"][0]["retrieved"] == ["oomkilled", "crashloopbackoff"]
+    assert (d / "oom-killed.runbooks.json").is_file()
+
+
+def test_non_rag_run_is_still_prompt_v2():
+    s = run_eval([OOM], ScriptedModel(GOOD_OOM), lambda ns: {}, 1, out_dir())
+    assert s["prompt_version"] == "v2" and s["rag"] is False and s["citation_accuracy"] is None

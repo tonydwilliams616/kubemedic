@@ -77,3 +77,38 @@ def test_system_prompt_lists_exactly_the_contract_actions():
 
 def test_results_record_the_prompt_version():
     assert diagnose(BUNDLE, FakeModel(json.dumps(GOOD))).prompt_version == PROMPT_VERSION
+
+
+# ---------- prompt v3: runbooks and citations ----------
+from kubemedic.diagnose import RAG_PROMPT_VERSION, SYSTEM_PROMPT_RAG  # noqa: E402
+
+PAGES = [{"id": "oomkilled", "title": "Killed for memory", "body": "OOMKilled means the limit was exceeded."},
+         {"id": "crashloopbackoff", "title": "Crash loop", "body": "Read the previous logs."}]
+
+
+def test_rag_answer_with_valid_citation_uses_prompt_v3():
+    model = FakeModel(json.dumps(dict(GOOD, citations=["oomkilled"])))
+    r = diagnose(BUNDLE, model, runbooks=PAGES)
+    assert r.valid and r.prompt_version == RAG_PROMPT_VERSION
+    system, messages = model.requests[0]
+    assert system == SYSTEM_PROMPT_RAG and "<runbooks>" in messages[0]["content"][0]["text"]
+    assert '<runbook id="oomkilled">' in messages[0]["content"][0]["text"]
+
+
+def test_invented_or_missing_citation_triggers_a_repair():
+    model = FakeModel(json.dumps(dict(GOOD, citations=["made-up-page"])), json.dumps(dict(GOOD, citations=["oomkilled"])))
+    r = diagnose(BUNDLE, model, runbooks=PAGES)
+    assert r.valid and r.attempts == 2
+    assert "not among the supplied runbooks" in model.requests[1][1][-1]["content"][0]["text"]
+    r = diagnose(BUNDLE, FakeModel(json.dumps(GOOD), json.dumps(GOOD)), runbooks=PAGES)
+    assert not r.valid and "citations must be a non-empty list" in r.problems[0]
+
+
+def test_without_runbooks_citations_are_not_required():
+    r = diagnose(BUNDLE, FakeModel(json.dumps(GOOD)))
+    assert r.valid and r.prompt_version == PROMPT_VERSION
+
+
+def test_v3_prompt_extends_v2_and_warns_pages_can_be_wrong():
+    assert SYSTEM_PROMPT_RAG.startswith(SYSTEM_PROMPT.split("Runbooks:")[0].split("Rules:")[0])
+    assert "the search can be wrong" in SYSTEM_PROMPT_RAG and '"citations"' in SYSTEM_PROMPT_RAG
