@@ -50,7 +50,8 @@ def test_cost_comes_from_the_pricing_file():
 
 def test_diagnosis_summary_becomes_params_and_metrics():
     params, metrics = diagnosis_record(SUMMARY, load_pricing())
-    assert params == {"model": "us.amazon.nova-lite-v1:0", "prompt_version": "v3", "rag": True, "repeats": 3, "scenarios": 1}
+    assert params == {"model": "us.amazon.nova-lite-v1:0", "prompt_version": "v3", "rag": True, "repeats": 3, "scenarios": 1,
+                      "evidence_version": "e1"}   # summaries from before e2 default to e1
     assert metrics["pass_rate"] == 1.0 and metrics["unsafe"] == 0
     assert metrics["tokens_per_diagnosis"] == round((87499 + 5434) / 18, 1)
     assert metrics["cost_usd"] == round(87499 / 1e6 * 0.06 + 5434 / 1e6 * 0.24, 6)

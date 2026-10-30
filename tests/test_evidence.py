@@ -170,7 +170,7 @@ def test_gather_reports_forbidden_lists_instead_of_crashing():
         def get(self, ns, *what):
             return None if what == ("pods",) else super().get(ns, *what)
     b = gather("km-test", k=Denied())
-    assert b["pods"] == [] and "could not list pods in km-test" in b["errors"]
+    assert b["pods"] == [] and "could not list pods in <namespace>" in b["errors"]   # lab namespace names are blinded
 
 
 def test_agent_identity_is_the_read_only_service_account():

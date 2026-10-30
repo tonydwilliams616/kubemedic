@@ -15,9 +15,12 @@ import json
 import subprocess
 import sys
 
-from .redact import cap, redact, redact_value
+from .redact import blind_namespace, cap, redact, redact_value
 
 AGENT_USER = "system:serviceaccount:kubemedic-system:kubemedic-agent"
+# Bump whenever what the model sees in the evidence changes, so results say which version produced them.
+# e1: first bundle. e2: lab namespace names blinded (they named the fault, e.g. inside event messages).
+EVIDENCE_VERSION = "e2"
 MAX_MESSAGE = 300      # chars kept from any single status/event message
 MAX_LOG = 2000         # chars kept per log (the END of the log)
 LOG_TAIL_LINES = 50
@@ -238,8 +241,7 @@ def gather(ns: str, context: str = "kind-kubemedic", k: AgentKubectl | None = No
                 logs.append({"pod": p["metadata"]["name"], "container": cs["name"], "previous": previous,
                              "ok": ok, "redactions": n, "text": cap(text, MAX_LOG)})
 
-    return {
-        "namespace": ns,
+    shown = {
         "deployments": [summarise_deployment(d, replicasets) for d in deployments],
         "pods": [summarise_pod(p) for p in pods],
         "events": summarise_events(events),
@@ -247,6 +249,9 @@ def gather(ns: str, context: str = "kind-kubemedic", k: AgentKubectl | None = No
         "logs": logs,
         "errors": errors,
     }
+    # "namespace" is for our code (file names, logs) and is never shown to the model. Everything
+    # else is blinded: lab namespaces are named after their fault and appear inside event messages.
+    return {"namespace": ns, **blind_namespace(shown, ns)}
 
 
 def main(argv: list[str] | None = None) -> int:

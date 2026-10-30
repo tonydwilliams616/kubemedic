@@ -59,6 +59,7 @@ def diagnosis_record(summary: dict, pricing: dict) -> tuple[dict, dict]:
     params = {
         "model": summary["model"],
         "prompt_version": summary.get("prompt_version", "v1"),   # v1 runs predate prompt versioning
+        "evidence_version": summary.get("evidence_version", "e1"),   # e1 runs showed the namespace name
         "rag": summary.get("rag", False),
         "repeats": summary.get("repeats"),
         "scenarios": len(summary.get("per_scenario", [])),

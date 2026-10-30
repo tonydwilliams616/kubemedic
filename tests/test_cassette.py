@@ -35,7 +35,8 @@ class FakeBedrock:
 
     def converse(self, system, messages):
         self.calls += 1
-        ns = "km-oom-killed" if "km-oom-killed" in messages[0]["content"][0]["text"] else "km-missing-secret"
+        # The namespace is hidden from the model now, so tell scenarios apart by the runbook page shown.
+        ns = "km-oom-killed" if 'id="oomkilled"' in messages[0]["content"][0]["text"] else "km-missing-secret"
         return self.replies[ns].pop(0), {"input_tokens": 100, "output_tokens": 10}
 
 

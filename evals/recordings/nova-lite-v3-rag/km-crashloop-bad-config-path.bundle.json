@@ -52,7 +52,7 @@
    ],
    "rollout_history": [
     {
-     "revision": 11,
+     "revision": 15,
      "current": false,
      "change_cause": "release 2.3.0",
      "images": [
@@ -61,7 +61,7 @@
      "changes_from_previous": null
     },
     {
-     "revision": 12,
+     "revision": 16,
      "current": true,
      "change_cause": "release 2.4.0",
      "images": [
@@ -94,7 +94,7 @@
    "problem_conditions": []
   },
   {
-   "name": "api-6bb856d98c-v4mjh",
+   "name": "api-6bb856d98c-p4gmd",
    "owner": "api-6bb856d98c",
    "phase": "Running",
    "ready": "0/1",
@@ -133,114 +133,72 @@
   {
    "type": "Warning",
    "reason": "BackOff",
-   "object": "Pod/api-6bb856d98c-pkln5",
-   "count": 1337,
-   "message": "Back-off restarting failed container api in pod api-6bb856d98c-pkln5_km-crashloop-bad-config-path(86203745-85f0-48da-adae-7fb1c7b568c9)"
+   "object": "Pod/api-6bb856d98c-47rr7",
+   "count": 371,
+   "message": "Back-off restarting failed container api in pod api-6bb856d98c-47rr7_<namespace>(5a600e24-12a3-4f4f-9c6e-2413bda08b28)"
   },
   {
    "type": "Normal",
    "reason": "Scheduled",
-   "object": "Pod/api-69d7576d88-fntht",
+   "object": "Pod/api-6bb856d98c-p4gmd",
    "count": 1,
-   "message": "Successfully assigned km-crashloop-bad-config-path/api-69d7576d88-fntht to kubemedic-worker"
-  },
-  {
-   "type": "Normal",
-   "reason": "SuccessfulCreate",
-   "object": "ReplicaSet/api-69d7576d88",
-   "count": 1,
-   "message": "Created pod: api-69d7576d88-fntht"
-  },
-  {
-   "type": "Normal",
-   "reason": "ScalingReplicaSet",
-   "object": "Deployment/api",
-   "count": 3,
-   "message": "Scaled up replica set api-69d7576d88 to 1 from 0"
-  },
-  {
-   "type": "Normal",
-   "reason": "Pulled",
-   "object": "Pod/api-69d7576d88-fntht",
-   "count": 1,
-   "message": "Container image \"busybox:1.36\" already present on machine"
-  },
-  {
-   "type": "Normal",
-   "reason": "Created",
-   "object": "Pod/api-69d7576d88-fntht",
-   "count": 1,
-   "message": "Created container api"
-  },
-  {
-   "type": "Normal",
-   "reason": "Started",
-   "object": "Pod/api-69d7576d88-fntht",
-   "count": 1,
-   "message": "Started container api"
-  },
-  {
-   "type": "Normal",
-   "reason": "Scheduled",
-   "object": "Pod/api-6bb856d98c-v4mjh",
-   "count": 1,
-   "message": "Successfully assigned km-crashloop-bad-config-path/api-6bb856d98c-v4mjh to kubemedic-worker"
+   "message": "Successfully assigned <namespace>/api-6bb856d98c-p4gmd to kubemedic-worker"
   },
   {
    "type": "Normal",
    "reason": "SuccessfulDelete",
    "object": "ReplicaSet/api-6bb856d98c",
    "count": 1,
-   "message": "Deleted pod: api-6bb856d98c-pkln5"
+   "message": "Deleted pod: api-6bb856d98c-47rr7"
   },
   {
    "type": "Normal",
    "reason": "SuccessfulCreate",
    "object": "ReplicaSet/api-6bb856d98c",
    "count": 1,
-   "message": "Created pod: api-6bb856d98c-v4mjh"
+   "message": "Created pod: api-6bb856d98c-p4gmd"
   },
   {
    "type": "Normal",
    "reason": "ScalingReplicaSet",
    "object": "Deployment/api",
-   "count": 5,
+   "count": 7,
    "message": "Scaled down replica set api-6bb856d98c to 0 from 1"
   },
   {
    "type": "Normal",
    "reason": "ScalingReplicaSet",
    "object": "Deployment/api",
-   "count": 5,
+   "count": 7,
    "message": "Scaled up replica set api-6bb856d98c to 1 from 0"
   },
   {
    "type": "Normal",
    "reason": "Pulled",
-   "object": "Pod/api-6bb856d98c-v4mjh",
+   "object": "Pod/api-6bb856d98c-p4gmd",
    "count": 3,
    "message": "Container image \"busybox:1.36\" already present on machine"
   },
   {
    "type": "Normal",
    "reason": "Created",
-   "object": "Pod/api-6bb856d98c-v4mjh",
+   "object": "Pod/api-6bb856d98c-p4gmd",
    "count": 3,
    "message": "Created container api"
   },
   {
    "type": "Normal",
    "reason": "Started",
-   "object": "Pod/api-6bb856d98c-v4mjh",
+   "object": "Pod/api-6bb856d98c-p4gmd",
    "count": 3,
    "message": "Started container api"
   },
   {
    "type": "Warning",
    "reason": "BackOff",
-   "object": "Pod/api-6bb856d98c-v4mjh",
-   "count": 2,
-   "message": "Back-off restarting failed container api in pod api-6bb856d98c-v4mjh_km-crashloop-bad-config-path(2e675f10-cd6f-469c-8b11-b208ad539aa1)"
+   "object": "Pod/api-6bb856d98c-p4gmd",
+   "count": 3,
+   "message": "Back-off restarting failed container api in pod api-6bb856d98c-p4gmd_<namespace>(107a3d2f-4c7f-4edb-b4ce-d738b7549bc2)"
   }
  ],
  "configmaps": [
@@ -253,7 +211,7 @@
  ],
  "logs": [
   {
-   "pod": "api-6bb856d98c-v4mjh",
+   "pod": "api-6bb856d98c-p4gmd",
    "container": "api",
    "previous": false,
    "ok": true,
@@ -261,12 +219,12 @@
    "text": "FATAL: config file /etc/app/settings.yaml not found\n"
   },
   {
-   "pod": "api-6bb856d98c-v4mjh",
+   "pod": "api-6bb856d98c-p4gmd",
    "container": "api",
    "previous": true,
    "ok": true,
    "redactions": 0,
-   "text": "unable to retrieve container logs for containerd://eb737d85cabbbe5e87648fedf0d2fadf30fc35f1e59f7415d6bc3c8baad1f97e"
+   "text": "unable to retrieve container logs for containerd://5c2af7e553266edc844ee77fa582e354e1e437b34328f9d42cad4644ffae00e7"
   }
  ],
  "errors": []
