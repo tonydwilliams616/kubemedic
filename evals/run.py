@@ -11,7 +11,10 @@ Design choices:
   code with no AWS or cluster (see evals/cassette.py); --gate fails the run if scores drop
   below evals/gate.yaml. CI uses --replay with --gate.
 
-Usage: python -m evals.run [--model MODEL_ID] [--repeats 3] [--scenario ID ...] [--rag]
+- --agent scores the tool-using agent (kubemedic/agent.py) instead: it gathers its own evidence,
+  so there is no bundle, and its recording is a tape of both sides of the conversation.
+
+Usage: python -m evals.run [--model MODEL_ID] [--repeats 3] [--scenario ID ...] [--rag] [--agent]
        python -m evals.run --rag --record evals/recordings/<name>
        python -m evals.run --replay evals/recordings/<name> --gate evals/gate.yaml
 """
@@ -32,7 +35,7 @@ from lab import scenarios
 from lab.scenarios import Scenario
 
 from . import gate
-from .cassette import Player, Recorder
+from .cassette import Player, Recorder, TapePlayer, TapeRecorder, read_meta
 from .score import Score, score, summarise
 
 REPORTS_DIR = Path("reports")
@@ -42,10 +45,17 @@ def score_row(s: Score) -> dict:
     return asdict(s) | {"root_cause_ok": s.root_cause_ok, "passed": s.passed}
 
 
-def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict], repeats: int,
+def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict] | None, repeats: int,
              out_dir: Path, check_fn: Callable[[Scenario], tuple[bool, str]] | None = None,
-             retrieve_fn: Callable[[dict], list[dict]] | None = None) -> dict:
-    """retrieve_fn given = RAG run (prompt v3): pages are retrieved once per scenario, like the evidence."""
+             retrieve_fn: Callable[[dict], list[dict]] | None = None,
+             investigate_fn: Callable[[str], object] | None = None, agent_rag: bool = False) -> dict:
+    """retrieve_fn given = RAG run (prompt v3): pages are retrieved once per scenario, like the evidence.
+
+    investigate_fn given = agent run: called once per repeat with the namespace; the agent gathers
+    its own evidence with tools, so gather_fn and retrieve_fn are not used.
+    """
+    agent = investigate_fn is not None
+    rag = agent_rag if agent else bool(retrieve_fn)
     # 1. Every fault must be really there before we spend anything on the model.
     if check_fn:
         not_ready = [(sc.id, detail) for sc in selected for ok, detail in [check_fn(sc)] if not ok]
@@ -55,20 +65,23 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict], 
 
     out_dir.mkdir(parents=True, exist_ok=True)
     all_scores: list[Score] = []
+    all_results = []
     per_scenario = []
     tokens_in = tokens_out = 0
     latencies = []
 
     for sc in selected:
-        bundle = gather_fn(sc.namespace)
-        (out_dir / f"{sc.id}.bundle.json").write_text(json.dumps(bundle, indent=1))
-        pages = retrieve_fn(bundle) if retrieve_fn else None
-        if pages:
-            (out_dir / f"{sc.id}.runbooks.json").write_text(
-                json.dumps([{k: p[k] for k in ("id", "score")} for p in pages], indent=1))
+        bundle = pages = None
+        if not agent:   # one-shot: gather the evidence once and reuse it for every repeat
+            bundle = gather_fn(sc.namespace)
+            (out_dir / f"{sc.id}.bundle.json").write_text(json.dumps(bundle, indent=1))
+            pages = retrieve_fn(bundle) if retrieve_fn else None
+            if pages:
+                (out_dir / f"{sc.id}.runbooks.json").write_text(
+                    json.dumps([{k: p[k] for k in ("id", "score")} for p in pages], indent=1))
         scores, results = [], []
         for r in range(1, repeats + 1):
-            result = diagnose(bundle, model, runbooks=pages)
+            result = investigate_fn(sc.namespace) if agent else diagnose(bundle, model, runbooks=pages)
             results.append(result)
             s = score(result.diagnosis, sc.spec)
             scores.append(s)
@@ -78,6 +91,9 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict], 
             (out_dir / f"{sc.id}.run{r}.json").write_text(
                 json.dumps({"result": asdict(result), "score": score_row(s)}, indent=2))
         all_scores += scores
+        all_results += results
+        read = sorted({c["args"]["id"] for res in results for c in res.tool_calls
+                       if c["tool"] == "read_runbook" and c["ok"]})
         per_scenario.append({
             "scenario": sc.id,
             "passed": sum(s.passed for s in scores),
@@ -87,18 +103,27 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict], 
             "actions": sorted({s.action or "invalid" for s in scores}),
             "guardrail_blocks": sum(bool(res.guardrail_violations) for res in results),
             "overrides": sum(res.overridden for res in results),
-            "retrieved": [p["id"] for p in pages] if pages else None,
-            "cited_relevant": sum(bool(s.cited_relevant) for s in scores) if pages else None,
+            # The model's own choice was right: correct action that a guardrail did NOT have to override.
+            "model_action_ok": sum(s.action_ok and not res.overridden for s, res in zip(scores, results)),
+            "retrieved": [p["id"] for p in pages] if pages else (read if agent and rag else None),
+            "cited_relevant": sum(bool(s.cited_relevant) for s in scores) if rag else None,
+            "mean_steps": round(sum(res.steps for res in results) / len(results), 1) if agent else None,
             "repeats": repeats,
         })
 
+    n = max(len(all_scores), 1)
+    if agent:
+        from kubemedic.agent import AGENT_PROMPT_VERSION
+        version = AGENT_PROMPT_VERSION + ("-rag" if rag else "")
+    else:
+        version = RAG_PROMPT_VERSION if rag else PROMPT_VERSION
     summary = {
         "model": model.model_id,
-        "prompt_version": RAG_PROMPT_VERSION if retrieve_fn else PROMPT_VERSION,
+        "mode": "agent" if agent else "one-shot",
+        "prompt_version": version,
         "evidence_version": EVIDENCE_VERSION,
-        "rag": bool(retrieve_fn),
-        "citation_accuracy": (round(sum(bool(s.cited_relevant) for s in all_scores) / max(len(all_scores), 1), 2)
-                              if retrieve_fn else None),
+        "rag": rag,
+        "citation_accuracy": round(sum(bool(s.cited_relevant) for s in all_scores) / n, 2) if rag else None,
         "repeats": repeats,
         "runs": len(all_scores),
         **summarise(all_scores),
@@ -106,6 +131,11 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict], 
         # Runs where the model proposed something a guardrail blocked: the "unsafe before guardrails" count.
         "guardrail_blocks": sum(row["guardrail_blocks"] for row in per_scenario),
         "overrides": sum(row["overrides"] for row in per_scenario),
+        # System accuracy (action_accuracy) counts guardrail rescues; model accuracy doesn't.
+        "model_action_accuracy": round(sum(row["model_action_ok"] for row in per_scenario) / n, 2),
+        "mean_steps": round(sum(r.steps for r in all_results) / n, 1) if agent else None,
+        "mean_tool_calls": round(sum(len(r.tool_calls) for r in all_results) / n, 1) if agent else None,
+        "budget_exhausted": sum(any("budget exhausted" in p for p in r.problems) for r in all_results) if agent else None,
         "input_tokens": tokens_in,
         "output_tokens": tokens_out,
         "mean_latency_s": round(sum(latencies) / max(len(latencies), 1), 2),
@@ -117,20 +147,29 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict], 
 
 def print_scorecard(summary: dict) -> None:
     n = summary["repeats"]
-    print(f"\nmodel: {summary['model']}   prompt: {summary['prompt_version']}   repeats: {n}")
+    print(f"\nmodel: {summary['model']}   mode: {summary.get('mode', 'one-shot')}   "
+          f"prompt: {summary['prompt_version']}   repeats: {n}")
     print(f"{'scenario':<28} {'pass':<6} {'cause':<6} {'action':<7} {'unsafe':<7} actions chosen")
     for row in summary["per_scenario"]:
         print(f"{row['scenario']:<28} {row['passed']}/{n:<4} {row['root_cause_ok']}/{n:<4} "
               f"{row['action_ok']}/{n:<5} {row['unsafe']:<7} {', '.join(row['actions'])}")
     if summary.get("rag"):
-        print("\nretrieved pages, and how often the right one was cited:")
+        label = "runbooks the agent read" if summary.get("mode") == "agent" else "retrieved"
+        print(f"\n{label}, and how often the right page was cited:")
         for row in summary["per_scenario"]:
-            print(f"  {row['scenario']:<28} cited right page {row['cited_relevant']}/{n}   retrieved: {', '.join(row['retrieved'])}")
+            print(f"  {row['scenario']:<28} cited right page {row['cited_relevant']}/{n}   "
+                  f"{label}: {', '.join(row['retrieved'] or []) or 'none'}")
     print(f"\npass rate {summary['pass_rate']:.0%} | root cause {summary['root_cause_accuracy']:.0%} | "
           f"action {summary['action_accuracy']:.0%} | UNSAFE {summary['unsafe']} | invalid {summary['invalid']}"
           + (f" | citations {summary['citation_accuracy']:.0%}" if summary.get("rag") else ""))
     print(f"guardrails: blocked a proposed action in {summary['guardrail_blocks']} runs "
           f"(model fixed it in {summary['guardrail_blocks'] - summary['overrides']}, overridden to escalate in {summary['overrides']})")
+    if "model_action_accuracy" in summary:
+        print(f"action accuracy: system {summary['action_accuracy']:.0%} | model alone (no guardrail rescues) "
+              f"{summary['model_action_accuracy']:.0%}")
+    if summary.get("mode") == "agent":
+        print(f"agent: mean steps {summary['mean_steps']} | mean tool calls {summary['mean_tool_calls']} | "
+              f"ran out of budget {summary['budget_exhausted']}")
     print(f"tokens in/out {summary['input_tokens']}/{summary['output_tokens']} | "
           f"mean latency {summary['mean_latency_s']}s")
 
@@ -162,6 +201,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--scenario", action="append", help="limit to these scenario ids (repeatable)")
     p.add_argument("--context", default="kind-kubemedic")
     p.add_argument("--rag", action="store_true", help="retrieve the top 3 runbooks per scenario (prompt v3)")
+    p.add_argument("--agent", action="store_true", help="score the tool-using agent instead of the one-shot diagnoser")
     mode = p.add_mutually_exclusive_group()
     mode.add_argument("--record", type=Path, metavar="DIR", help="also save evidence and every model reply to DIR")
     mode.add_argument("--replay", type=Path, metavar="DIR",
@@ -172,7 +212,17 @@ def main(argv: list[str] | None = None) -> int:
     selected = [scenarios.load(i) for i in args.scenario] if args.scenario else scenarios.load_all()
 
     try:
+        investigate_fn, agent_rag, recorder, meta = None, False, None, None
         if args.replay:
+            meta = read_meta(args.replay)
+        if meta and meta.get("mode") == "agent":
+            tape = TapePlayer(args.replay)
+            model, gather_fn, retrieve_fn, check_fn = tape.model(), None, None, None
+            agent_rag, repeats, label = meta["rag"], meta["repeats"], "agent-replay"
+            # In a replay only the PRESENCE of a retriever matters (it switches the runbook tools on);
+            # the runbook answers themselves come from the tape.
+            investigate_fn = _agent_runner(model, None, _REPLAYED_RUNBOOKS if agent_rag else None, tape)
+        elif args.replay:
             player = Player(args.replay)
             model, gather_fn, check_fn = player, player.gather, None
             retrieve_fn = player.retrieve if player.meta["rag"] else None
@@ -182,18 +232,29 @@ def main(argv: list[str] | None = None) -> int:
             from kubemedic.evidence import gather
             model, check_fn, repeats = BedrockModel(args.model), _cluster_check(args.context), args.repeats
             gather_fn = lambda ns: gather(ns, args.context)  # noqa: E731
-            retrieve_fn = None
+            retriever = None
             if args.rag:
                 from kubemedic.retrieve import Retriever
-                retrieve_fn = Retriever().top_runbooks
+                retriever = Retriever()
+            retrieve_fn = retriever.top_runbooks if retriever else None
             label = "prompt" + (RAG_PROMPT_VERSION if args.rag else PROMPT_VERSION)
-            if args.record:
-                model = Recorder(model, args.record)
+            if args.agent:
+                from kubemedic.agent import AGENT_PROMPT_VERSION
+                from kubemedic.evidence import AgentKubectl
+                retrieve_fn, gather_fn, agent_rag = None, None, args.rag   # the agent searches for itself
+                label = "agent" + AGENT_PROMPT_VERSION + ("-rag" if args.rag else "")
+                if args.record:
+                    recorder = TapeRecorder(args.record)
+                    model = recorder.model(model)
+                investigate_fn = _agent_runner(model, AgentKubectl(args.context), retriever, recorder)
+            elif args.record:
+                model = recorder = Recorder(model, args.record)
                 gather_fn = model.gathering(gather_fn)
                 retrieve_fn = model.retrieving(retrieve_fn) if retrieve_fn else None
         safe_model = model.model_id.replace(":", "_").replace("/", "_")
         out_dir = REPORTS_DIR / f"{time.strftime('%Y%m%d-%H%M%S')}-{safe_model}-{label}"
-        summary = run_eval(selected, model, gather_fn, repeats, out_dir, check_fn, retrieve_fn)
+        summary = run_eval(selected, model, gather_fn, repeats, out_dir, check_fn, retrieve_fn,
+                           investigate_fn, agent_rag)
     except RuntimeError as e:   # includes NotRecorded: replay hit something the recording lacks
         print(f"error: {e}", file=sys.stderr)
         return 2
@@ -206,11 +267,11 @@ def main(argv: list[str] | None = None) -> int:
 
     print_scorecard(summary)
     print(f"\nfull results: {out_dir}/")
-    if args.record:
-        model.save(summary)
+    if recorder:
+        recorder.save(summary)
         print(f"recording saved: {args.record}/ (commit it so CI replays these answers)")
     if args.replay:
-        print(f"replayed: {args.replay}/ recorded {player.meta['recorded_at']} (latency is not meaningful in a replay)")
+        print(f"replayed: {args.replay}/ recorded {meta['recorded_at']} (latency is not meaningful in a replay)")
     else:  # a replay is a re-check of an old run, not a new experiment, so it isn't tracked
         _track(summary, out_dir, {"embed_model": EMBED_MODEL} if args.rag else None)
     if args.gate:
@@ -221,6 +282,26 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(f"gate passed ({args.gate})")
     return 0
+
+
+_REPLAYED_RUNBOOKS = object()   # stands in for a Retriever in agent replays; see main()
+
+
+def _agent_runner(model, kubectl, retriever, tape=None) -> Callable[[str], object]:
+    """Build the function run_eval calls once per repeat: a fresh Toolbox, then one investigation.
+
+    With a tape (recording or replay), the toolbox's backend goes through it, so the agent's
+    questions are answered live-and-recorded, or from the recording.
+    """
+    from kubemedic.agent import investigate
+    from kubemedic.tools import Toolbox
+
+    def run(namespace: str):
+        toolbox = Toolbox(namespace, kubectl, retriever)
+        if tape:
+            toolbox.backend = tape.taped(f"tools:{namespace}", toolbox.backend)
+        return investigate(toolbox, model)
+    return run
 
 
 def _track(summary: dict, out_dir: Path, extra: dict | None) -> None:

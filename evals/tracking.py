@@ -60,13 +60,15 @@ def diagnosis_record(summary: dict, pricing: dict) -> tuple[dict, dict]:
         "model": summary["model"],
         "prompt_version": summary.get("prompt_version", "v1"),   # v1 runs predate prompt versioning
         "evidence_version": summary.get("evidence_version", "e1"),   # e1 runs showed the namespace name
+        "mode": summary.get("mode", "one-shot"),
         "rag": summary.get("rag", False),
         "repeats": summary.get("repeats"),
         "scenarios": len(summary.get("per_scenario", [])),
     }
     metrics = {k: summary[k] for k in (
         "pass_rate", "root_cause_accuracy", "action_accuracy", "unsafe", "invalid",
-        "citation_accuracy", "guardrail_blocks", "overrides",
+        "citation_accuracy", "guardrail_blocks", "overrides", "model_action_accuracy",
+        "mean_steps", "mean_tool_calls", "budget_exhausted",
         "input_tokens", "output_tokens", "mean_latency_s") if summary.get(k) is not None}
     metrics["tokens_per_diagnosis"] = round((summary["input_tokens"] + summary["output_tokens"]) / runs, 1)
     cost = estimate_cost(summary["model"], summary["input_tokens"], summary["output_tokens"], pricing)

@@ -6,6 +6,9 @@ A recording (evals/recordings/<name>/) holds:
 - <namespace>.bundle.json:         the evidence the model was shown
 - <namespace>.runbooks.json:       which runbook pages were retrieved (RAG runs only)
 
+(The tool-using agent is recorded differently, as a "tape" of both sides of its conversation:
+see the bottom of this file.)
+
 Replay pushes the same evidence through today's code (diagnose, contract checks, citation
 checks, guardrails, scoring) and answers each model call from calls.json instead of Bedrock.
 
@@ -15,10 +18,12 @@ and replay stops with a "re-record" error instead of silently reusing out-of-dat
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import shutil
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
@@ -30,6 +35,27 @@ RERECORD_HINT = "the code now sends the model something that was never recorded;
 
 class NotRecorded(RuntimeError):
     """Replay was asked for something the recording doesn't contain."""
+
+
+def read_meta(path: Path) -> dict:
+    if not (path / "meta.json").is_file():
+        raise NotRecorded(f"no recording at {path}; create one with `make record` or `make record-agent`")
+    return json.loads((path / "meta.json").read_text())
+
+
+def _start(path: Path) -> Path:
+    """Recordings are written to <name>.partial and only swapped in by _finish, so a failed run never destroys a good one."""
+    partial = path.with_name(path.name + ".partial")
+    if partial.exists():
+        shutil.rmtree(partial)
+    partial.mkdir(parents=True)
+    return partial
+
+
+def _finish(partial: Path, final: Path) -> None:
+    if final.exists():
+        shutil.rmtree(final)    # a recording is always one complete run, never a mix of two
+    partial.rename(final)
 
 
 def fingerprint(model_id: str, system: str, messages: list[dict]) -> str:
@@ -44,12 +70,7 @@ class Recorder:
     def __init__(self, model, path: Path):
         self.inner, self.model_id, self.final = model, model.model_id, path
         self.calls: dict[str, list[dict]] = {}
-        # Write into <name>.partial and only replace the real recording in save(), so a run that
-        # fails halfway (cluster not broken, login expired) never destroys a good recording.
-        self.path = path.with_name(path.name + ".partial")
-        if self.path.exists():
-            shutil.rmtree(self.path)
-        self.path.mkdir(parents=True)
+        self.path = _start(path)      # see _start: a failed run never destroys a good recording
 
     def converse(self, system: str, messages: list[dict]) -> tuple[str, dict]:
         text, usage = self.inner.converse(system, messages)
@@ -82,19 +103,15 @@ class Recorder:
                  "scenarios": [row["scenario"] for row in summary["per_scenario"]]}
         (self.path / "meta.json").write_text(json.dumps(meta, indent=2))
         (self.path / "calls.json").write_text(json.dumps(self.calls, indent=1, ensure_ascii=False))
-        if self.final.exists():
-            shutil.rmtree(self.final)  # a recording is always one complete run, never a mix of two
-        self.path.rename(self.final)
+        _finish(self.path, self.final)
 
 
 class Player:
     """Pretends to be the model (and the cluster, and the runbook search) using a recording."""
 
     def __init__(self, path: Path):
-        if not (path / "meta.json").is_file():
-            raise NotRecorded(f"no recording at {path}; create one with `make record`")
         self.path = path
-        self.meta = json.loads((path / "meta.json").read_text())
+        self.meta = read_meta(path)
         self.calls = json.loads((path / "calls.json").read_text())
         self.model_id = self.meta["model"]
         self._used: dict[str, int] = {}     # how many replies of each request have been handed out
@@ -129,3 +146,75 @@ class Player:
             raise NotRecorded(f"recorded runbooks no longer exist: {missing}: {RERECORD_HINT}")
         return [{"id": h["id"], "title": pages[h["id"]].title, "score": h["score"],
                  "body": pages[h["id"]].body} for h in hits]
+
+
+# ---------- the agent: tape both sides of the conversation ----------
+#
+# The one-shot diagnoser gets one fixed bundle, so recording the bundle and the model's replies is
+# enough. The agent asks its own questions, so two channels are taped instead:
+# - "model:<id>"       every model step, keyed by the full request (system prompt, messages, tools)
+# - "tools:<ns>"       every tool answer, recorded AFTER our code has summarised and redacted it,
+#                      so a recording never holds raw cluster data
+# Identical calls (the same tool in every repeat) replay in the order they were recorded.
+
+def call_key(channel: str, args: tuple) -> str:
+    raw = json.dumps([channel, list(args)], sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+@dataclass
+class TapedModel:
+    """Stands in for BedrockModel in agent runs: same model_id, converse_tools goes through the tape."""
+    model_id: str
+    converse_tools: Callable
+
+
+class TapeRecorder:
+    def __init__(self, path: Path):
+        self.final, self.path = path, _start(path)
+        self.calls: dict[str, list] = {}
+
+    def taped(self, channel: str, fn: Callable) -> Callable:
+        """Wrap fn so every call passes through and its answer is kept."""
+        def wrapper(*args):
+            out = fn(*args)
+            # Store a copy now: the agent later edits objects it got back (e.g. a guardrail override).
+            self.calls.setdefault(call_key(channel, args), []).append(json.loads(json.dumps(out)))
+            return out
+        return wrapper
+
+    def model(self, model) -> TapedModel:
+        return TapedModel(model.model_id, self.taped(f"model:{model.model_id}", model.converse_tools))
+
+    def save(self, summary: dict) -> None:
+        meta = {k: summary[k] for k in ("model", "prompt_version", "evidence_version", "rag", "repeats")}
+        meta |= {"mode": "agent", "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                 "scenarios": [row["scenario"] for row in summary["per_scenario"]]}
+        (self.path / "meta.json").write_text(json.dumps(meta, indent=2))
+        (self.path / "tape.json").write_text(json.dumps(self.calls, indent=1, ensure_ascii=False))
+        _finish(self.path, self.final)
+
+
+class TapePlayer:
+    def __init__(self, path: Path):
+        self.meta = read_meta(path)
+        self.calls = json.loads((path / "tape.json").read_text())
+        self._used: dict[str, int] = {}
+
+    def taped(self, channel: str, fn: Callable | None = None) -> Callable:
+        """A function that answers from the tape (fn, the real thing, is ignored: nothing live is touched)."""
+        def replay(*args):
+            key = call_key(channel, args)
+            answers = self.calls.get(key)
+            if not answers:
+                raise NotRecorded(f"{channel} call {key} not in the recording: {RERECORD_HINT.replace('make record', 'make record-agent')}")
+            n = self._used.get(key, 0)
+            if n >= len(answers):
+                raise NotRecorded(f"{channel} call {key} made more times than recorded: "
+                                  + RERECORD_HINT.replace("make record", "make record-agent"))
+            self._used[key] = n + 1
+            return copy.deepcopy(answers[n])     # a fresh copy, so the agent can't alter the tape
+        return replay
+
+    def model(self) -> TapedModel:
+        return TapedModel(self.meta["model"], self.taped(f"model:{self.meta['model']}"))

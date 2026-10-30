@@ -132,6 +132,30 @@ action 100%, unsafe 0, citations 100%.
   described the 64-CPU request correctly without the word "Unschedulable", which is the case for
   an LLM-as-judge grader later.
 
+### One-shot vs tool-using agent (Phase 4)
+
+Same six scenarios × 3, Nova Lite, runbooks on, namespace names hidden (evidence e2).
+
+| | Pass | Action (system) | Action (model alone) | No answer | Citations | Tokens / diagnosis | Cost / diagnosis | Time |
+|---|---|---|---|---|---|---|---|---|
+| One-shot v3 | **100%** | **100%** | 83% | **0** | **100%** | **5,200** | **$0.00036** | **2.4 s** |
+| Agent a1 | 72% | 78% | 78% | 4 | 67% | 26,100 | $0.0016 | 8.9 s |
+
+**The first agent lost on every measure.** The traces show why: in 4 of its 5 failures it never
+submitted an answer and ran out of its 12-step budget, going round in circles. On
+`unschedulable-requests` it asked for the logs of a pod that never started (there are none), read
+two runbooks, then asked for the same logs again. On `oom-killed` it found the right runbook at
+step 7 and then re-read the same two pages until time ran out. With greedy decoding the same
+mistake repeats exactly, so the failures are fully reproducible.
+
+The one-shot diagnoser wins here because its evidence is gathered and curated by code up front;
+the agent has to find the same facts itself, and a small model is weak at deciding when it has
+enough. An agent should pay off only when the evidence can't be gathered in advance.
+
+**Champion/challenger:** the one-shot diagnoser stays the gated production path. The agent's
+recording is replayed in CI on every PR and its scores reported, but it doesn't block merges
+until it passes the gate itself.
+
 ### Runbook search
 
 | hit@1 | hit@3 | MRR | Smallest margin |
@@ -183,7 +207,7 @@ deploy/agent/rbac.yaml    the agent's read-only identity
 kubemedic/                the agent: contract, redaction, evidence, diagnosis
 runbooks/                 symptom-first runbooks the agent retrieves and cites
 evals/                    scorers, eval runners, record/replay, merge gate, MLflow tracking, model prices
-evals/recordings/         recorded model answers that CI replays on every PR
+evals/recordings/         recorded model answers (one-shot) and conversation tapes (agent) that CI replays on every PR
 tests/                    unit tests (no cluster or AWS needed)
 .github/workflows/ci.yaml lint + tests, then break, check, RBAC-check and evidence on a live kind cluster
 ```
@@ -196,7 +220,7 @@ tests/                    unit tests (no cluster or AWS needed)
 | 1 | Read-only diagnoser on Amazon Bedrock and an eval harness ✅ |
 | 2 | RAG over symptom-first runbooks: retrieval eval, citations, with vs without comparison ✅ |
 | 3 | Experiment tracking with MLflow; evals as a CI gate (recorded model answers replayed on every PR) ✅ |
-| 4 | Tool-using agent: the model chooses what to inspect next, step by step, instead of one fixed bundle ← *next* |
+| 4 | Tool-using agent: the model chooses what to inspect next, step by step, instead of one fixed bundle ← *here* |
 | 5 | Allowlisted remediation executor with its own identity, human approval and an audit log |
 | 6 | Self-hosted open model on EKS: Karpenter GPU nodes, vLLM serving, scale to zero; accuracy, latency and cost per diagnosis compared with Bedrock |
 | 7 | Production metrics: tokens, cost, latency and success rate in Prometheus/Grafana |

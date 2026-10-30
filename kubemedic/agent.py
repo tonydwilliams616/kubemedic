@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 import time
 from dataclasses import asdict
@@ -28,8 +27,7 @@ from dataclasses import asdict
 from . import guardrails
 from .contract import ACTIONS, validate, validate_citations
 from .diagnose import DEFAULT_MODEL, SYSTEM_PROMPT, Result
-from .evidence import summarise_deployment
-from .tools import NAME, Toolbox, bedrock_spec
+from .tools import Toolbox, bedrock_spec
 
 # Bump on any change to the agent's prompt or task. a1: first agent.
 AGENT_PROMPT_VERSION = "a1"
@@ -90,12 +88,8 @@ def deployment_facts(toolbox: Toolbox, diag: dict) -> dict:
     claiming facts in its own messages.
     """
     target = (diag.get("proposed_action") or {}).get("target") or ""
-    name = target.partition("/")[2]
-    if not re.fullmatch(NAME["pattern"], name):        # same injection rule as the tools
-        return {"deployments": []}
-    dep = toolbox.k.get(toolbox.ns, "deployment", name)
-    rs = toolbox.k.get(toolbox.ns, "replicasets") or {"items": []}
-    return {"deployments": [summarise_deployment(dep, rs["items"])] if dep else []}
+    dep = toolbox.deployment_facts(target.partition("/")[2])   # rejects names that aren't valid Kubernetes names
+    return {"deployments": [dep] if dep else []}
 
 
 def _tool_result(use_id: str, payload: dict, ok: bool) -> dict:
@@ -158,8 +152,9 @@ def investigate(toolbox: Toolbox, model, max_steps: int = MAX_STEPS, max_repairs
                 result.diagnosis, result.valid, result.problems, done = diag, True, [], True
             elif last_try and broken and problems == broken:
                 # Fail closed, exactly as in the one-shot diagnoser: keep the diagnosis, hand the decision to a human.
-                diag["proposed_action"] = {"action": "escalate",
-                                           "reason": "guardrail blocked the proposed action: " + "; ".join(broken)}
+                # A corrected COPY: never edit the model's own answer in place (it is still part of the conversation).
+                diag = {**diag, "proposed_action": {"action": "escalate",
+                                                    "reason": "guardrail blocked the proposed action: " + "; ".join(broken)}}
                 result.diagnosis, result.valid, result.problems, result.overridden, done = diag, True, [], True, True
             else:
                 result.diagnosis, result.problems = diag, problems
