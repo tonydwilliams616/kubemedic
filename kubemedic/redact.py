@@ -70,3 +70,23 @@ def cap(text: str, max_chars: int = 4000) -> str:
         return text
     cut = len(text) - max_chars
     return f"[... {cut} earlier characters omitted ...]\n" + text[-max_chars:]
+
+
+# Lab namespaces are named after their fault (km-oom-killed), so showing the name would hand the
+# model the answer. Only lab namespaces are blinded: in a real cluster the namespace name is
+# legitimate context, and it may equal a Deployment name, which blinding would destroy.
+LAB_NAMESPACE_PREFIX = "km-"
+NAMESPACE_MASK = "<namespace>"
+
+
+def blind_namespace(obj, namespace: str):
+    """Replace a lab namespace's name everywhere inside obj (strings, lists, dicts); anything else is unchanged."""
+    if not namespace or not namespace.startswith(LAB_NAMESPACE_PREFIX):
+        return obj
+    if isinstance(obj, str):
+        return obj.replace(namespace, NAMESPACE_MASK)
+    if isinstance(obj, list):
+        return [blind_namespace(x, namespace) for x in obj]
+    if isinstance(obj, dict):
+        return {k: blind_namespace(v, namespace) for k, v in obj.items()}
+    return obj

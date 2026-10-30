@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Callable
 
 from kubemedic.diagnose import DEFAULT_MODEL, PROMPT_VERSION, RAG_PROMPT_VERSION, diagnose
+from kubemedic.evidence import EVIDENCE_VERSION
 from kubemedic.retrieve import EMBED_MODEL
 from lab import scenarios
 from lab.scenarios import Scenario
@@ -94,6 +95,7 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict], 
     summary = {
         "model": model.model_id,
         "prompt_version": RAG_PROMPT_VERSION if retrieve_fn else PROMPT_VERSION,
+        "evidence_version": EVIDENCE_VERSION,
         "rag": bool(retrieve_fn),
         "citation_accuracy": (round(sum(bool(s.cited_relevant) for s in all_scores) / max(len(all_scores), 1), 2)
                               if retrieve_fn else None),

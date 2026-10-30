@@ -116,19 +116,30 @@ Amazon Nova Lite (`us.amazon.nova-lite-v1:0`), 6 scenarios × 3 repeats, tempera
 - *RAG costs about 2.7× the tokens; the guardrail costs nothing.* The runbooks add text to every prompt; the guardrail is plain code.
 - *The eval set is now saturated* (100% on everything), so it can no longer tell a better model from a worse one. Harder, held-out scenarios come next.
 
-**Recorded for the CI gate (30 October, live run):** pass 94%, root cause 94%, action 100%,
-unsafe 0, citations 100%. The guardrail fired for real for the first time: on
-`unschedulable-requests` the model's final answer proposed a rollback although the Deployment
-has no earlier revision, and the guardrail overrode it to escalate. The one failed run is a grader
-miss rather than a wrong diagnosis: the model correctly found the 64-CPU request but never used
-the word "Unschedulable", which the keyword-based root cause check requires. That is the case
-for an LLM-as-judge grader later.
+**Recorded for the CI gate (evidence e2, namespace names hidden):** pass 100%, root cause 100%,
+action 100%, unsafe 0, citations 100%.
+
+- *Eval leak found and fixed.* Lab namespaces are named after their fault (`km-oom-killed`), and
+  that name reached the model in the bundle and inside event messages (`pod worker-..._km-oom-killed`).
+  Evidence version e2 replaces it with `<namespace>` everywhere the model or the search could see it;
+  the recording shows zero occurrences. Scores did not drop, so the earlier results were not
+  explained by the leak, and every result now records its `evidence_version`.
+- *System accuracy is not model accuracy.* On `unschedulable-requests` the model proposed a
+  rollback in all 3 runs, even after one correction, although there is no earlier revision; the guardrail
+  overrode every one to escalate. The system's actions were 100% correct; the model's own were
+  15/18 (83%). The guardrail is doing real work, and the gap is worth tracking.
+- *Grader limits.* Root cause is graded by keywords. An earlier recording failed one run that
+  described the 64-CPU request correctly without the word "Unschedulable", which is the case for
+  an LLM-as-judge grader later.
 
 ### Runbook search
 
 | hit@1 | hit@3 | MRR | Smallest margin |
 |---|---|---|---|
-| 83% | 100% | 0.92 | 0.064 |
+| 83% | 100% | 0.92 | 0.122 |
+
+With namespace names hidden (e2) the ranks are unchanged and the smallest margin rose from
+0.064 to 0.122: the leaked name was noise in the search query, not a hint.
 
 hit@1: the right runbook ranked first. hit@3: it was in the top 3 the model is shown. MRR: 1/rank averaged (1.0 = always first). Margin: how far ahead the top result was. The miss is `oom-killed`, ranked second behind the crash-loop runbook because the evidence is full of restart events.
 

@@ -23,6 +23,7 @@ from typing import Protocol
 
 from . import guardrails
 from .contract import ACTIONS, validate, validate_citations
+from .redact import blind_namespace
 
 DEFAULT_MODEL = os.environ.get("KUBEMEDIC_MODEL", "us.amazon.nova-lite-v1:0")
 MAX_OUTPUT_TOKENS = 1000
@@ -165,8 +166,10 @@ def build_user_message(bundle: dict, runbooks: list[dict] | None = None) -> str:
         pages = "<runbooks>\n" + "\n".join(
             f'<runbook id="{rb["id"]}">\n# {rb["title"]}\n{rb["body"]}\n</runbook>' for rb in runbooks
         ) + "\n</runbooks>\n"
+    # The namespace name is for our code only: lab namespaces are named after their fault.
+    shown = blind_namespace({k: v for k, v in bundle.items() if k != "namespace"}, bundle.get("namespace", ""))
     return ("Diagnose this namespace.\n" + pages + "<evidence>\n"
-            + json.dumps(bundle, indent=1)
+            + json.dumps(shown, indent=1)
             + "\n</evidence>\nRemember: reply with the JSON object only.")
 
 

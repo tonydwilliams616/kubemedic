@@ -20,8 +20,8 @@
     {
      "type": "Progressing",
      "status": "True",
-     "reason": "ReplicaSetUpdated",
-     "message": "ReplicaSet \"frontend-86474b9b8d\" is progressing."
+     "reason": "NewReplicaSetAvailable",
+     "message": "ReplicaSet \"frontend-6c966575b\" has successfully progressed."
     }
    ],
    "containers": [
@@ -47,7 +47,7 @@
    "configmaps_used": [],
    "rollout_history": [
     {
-     "revision": 11,
+     "revision": 15,
      "current": false,
      "change_cause": "release 3.1.0",
      "images": [
@@ -56,7 +56,7 @@
      "changes_from_previous": null
     },
     {
-     "revision": 12,
+     "revision": 16,
      "current": true,
      "change_cause": "release 3.2.0",
      "images": [
@@ -107,7 +107,7 @@
    "problem_conditions": []
   },
   {
-   "name": "frontend-86474b9b8d-lm9m2",
+   "name": "frontend-86474b9b8d-swkfb",
    "owner": "frontend-86474b9b8d",
    "phase": "Running",
    "ready": "0/1",
@@ -140,83 +140,83 @@
   {
    "type": "Warning",
    "reason": "Unhealthy",
-   "object": "Pod/frontend-86474b9b8d-xr4dz",
-   "count": 3715,
+   "object": "Pod/frontend-86474b9b8d-5jbn6",
+   "count": 1025,
    "message": "Readiness probe failed: HTTP probe failed with statuscode: 404"
   },
   {
    "type": "Normal",
    "reason": "Scheduled",
-   "object": "Pod/frontend-86474b9b8d-lm9m2",
+   "object": "Pod/frontend-86474b9b8d-swkfb",
    "count": 1,
-   "message": "Successfully assigned km-failing-readiness-probe/frontend-86474b9b8d-lm9m2 to kubemedic-worker"
-  },
-  {
-   "type": "Normal",
-   "reason": "SuccessfulDelete",
-   "object": "ReplicaSet/frontend-86474b9b8d",
-   "count": 1,
-   "message": "Deleted pod: frontend-86474b9b8d-xr4dz"
-  },
-  {
-   "type": "Normal",
-   "reason": "SuccessfulCreate",
-   "object": "ReplicaSet/frontend-86474b9b8d",
-   "count": 1,
-   "message": "Created pod: frontend-86474b9b8d-lm9m2"
-  },
-  {
-   "type": "Normal",
-   "reason": "ScalingReplicaSet",
-   "object": "Deployment/frontend",
-   "count": 5,
-   "message": "Scaled down replica set frontend-86474b9b8d to 0 from 1"
-  },
-  {
-   "type": "Normal",
-   "reason": "ScalingReplicaSet",
-   "object": "Deployment/frontend",
-   "count": 5,
-   "message": "Scaled up replica set frontend-86474b9b8d to 1 from 0"
+   "message": "Successfully assigned <namespace>/frontend-86474b9b8d-swkfb to kubemedic-worker"
   },
   {
    "type": "Normal",
    "reason": "Pulled",
-   "object": "Pod/frontend-86474b9b8d-lm9m2",
+   "object": "Pod/frontend-86474b9b8d-swkfb",
    "count": 1,
    "message": "Container image \"nginx:1.27-alpine\" already present on machine"
   },
   {
    "type": "Normal",
    "reason": "Created",
-   "object": "Pod/frontend-86474b9b8d-lm9m2",
+   "object": "Pod/frontend-86474b9b8d-swkfb",
    "count": 1,
    "message": "Created container frontend"
   },
   {
    "type": "Normal",
    "reason": "Started",
-   "object": "Pod/frontend-86474b9b8d-lm9m2",
+   "object": "Pod/frontend-86474b9b8d-swkfb",
    "count": 1,
    "message": "Started container frontend"
   },
   {
+   "type": "Normal",
+   "reason": "SuccessfulDelete",
+   "object": "ReplicaSet/frontend-86474b9b8d",
+   "count": 1,
+   "message": "Deleted pod: frontend-86474b9b8d-5jbn6"
+  },
+  {
+   "type": "Normal",
+   "reason": "SuccessfulCreate",
+   "object": "ReplicaSet/frontend-86474b9b8d",
+   "count": 1,
+   "message": "Created pod: frontend-86474b9b8d-swkfb"
+  },
+  {
+   "type": "Normal",
+   "reason": "ScalingReplicaSet",
+   "object": "Deployment/frontend",
+   "count": 7,
+   "message": "Scaled down replica set frontend-86474b9b8d to 0 from 1"
+  },
+  {
+   "type": "Normal",
+   "reason": "ScalingReplicaSet",
+   "object": "Deployment/frontend",
+   "count": 7,
+   "message": "Scaled up replica set frontend-86474b9b8d to 1 from 0"
+  },
+  {
    "type": "Warning",
    "reason": "Unhealthy",
-   "object": "Pod/frontend-86474b9b8d-lm9m2",
-   "count": 6,
+   "object": "Pod/frontend-86474b9b8d-swkfb",
+   "count": 7,
    "message": "Readiness probe failed: HTTP probe failed with statuscode: 404"
   }
  ],
  "configmaps": [],
  "logs": [
   {
-   "pod": "frontend-86474b9b8d-lm9m2",
+   "pod": "frontend-86474b9b8d-swkfb",
    "container": "frontend",
    "previous": false,
    "ok": true,
    "redactions": 0,
-   "text": "[... 1190 earlier characters omitted ...]\n2026/10/30 16:14:28 [notice] 1#1: start worker process 34\n2026/10/30 16:14:28 [notice] 1#1: start worker process 35\n2026/10/30 16:14:29 [error] 33#33: *1 open() \"/usr/share/nginx/html/healthz\" failed (2: No such file or directory), client: 10.244.1.1, server: localhost, request: \"GET /healthz HTTP/1.1\", host: \"10.244.1.42:80\"\n10.244.1.1 - - [30/Oct/2026:16:14:29 +0000] \"GET /healthz HTTP/1.1\" 404 153 \"-\" \"kube-probe/1.31\" \"-\"\n2026/10/30 16:14:30 [error] 34#34: *2 open() \"/usr/share/nginx/html/healthz\" failed (2: No such file or directory), client: 10.244.1.1, server: localhost, request: \"GET /healthz HTTP/1.1\", host: \"10.244.1.42:80\"\n10.244.1.1 - - [30/Oct/2026:16:14:30 +0000] \"GET /healthz HTTP/1.1\" 404 153 \"-\" \"kube-probe/1.31\" \"-\"\n2026/10/30 16:14:33 [error] 35#35: *3 open() \"/usr/share/nginx/html/healthz\" failed (2: No such file or directory), client: 10.244.1.1, server: localhost, request: \"GET /healthz HTTP/1.1\", host: \"10.244.1.42:80\"\n10.244.1.1 - - [30/Oct/2026:16:14:33 +0000] \"GET /healthz HTTP/1.1\" 404 153 \"-\" \"kube-probe/1.31\" \"-\"\n10.244.1.1 - - [30/Oct/2026:16:14:38 +0000] \"GET /healthz HTTP/1.1\" 404 153 \"-\" \"kube-probe/1.31\" \"-\"\n2026/10/30 16:14:38 [error] 33#33: *4 open() \"/usr/share/nginx/html/healthz\" failed (2: No such file or directory), client: 10.244.1.1, server: localhost, request: \"GET /healthz HTTP/1.1\", host: \"10.244.1.42:80\"\n2026/10/30 16:14:43 [error] 33#33: *5 open() \"/usr/share/nginx/html/healthz\" failed (2: No such file or directory), client: 10.244.1.1, server: localhost, request: \"GET /healthz HTTP/1.1\", host: \"10.244.1.42:80\"\n10.244.1.1 - - [30/Oct/2026:16:14:43 +0000] \"GET /healthz HTTP/1.1\" 404 153 \"-\" \"kube-probe/1.31\" \"-\"\n2026/10/30 16:14:48 [error] 33#33: *6 open() \"/usr/share/nginx/html/healthz\" failed (2: No such file or directory), client: 10.244.1.1, server: localhost, request: \"GET /healthz HTTP/1.1\", host: \"10.244.1.42:80\"\n10.244.1.1 - - [30/Oct/2026:16:14:48 +0000] \"GET /healthz HTTP/1.1\" 404 153 \"-\" \"kube-probe/1.31\" \"-\"\n"
+   "text": "[... 1504 earlier characters omitted ...]\n.244.1.52:80\"\n10.244.1.1 - - [30/Oct/2026:20:19:35 +0000] \"GET /healthz HTTP/1.1\" 404 153 \"-\" \"kube-probe/1.31\" \"-\"\n2026/10/30 20:19:36 [error] 34#34: *2 open() \"/usr/share/nginx/html/healthz\" failed (2: No such file or directory), client: 10.244.1.1, server: localhost, request: \"GET /healthz HTTP/1.1\", host: \"10.244.1.52:80\"\n10.244.1.1 - - [30/Oct/2026:20:19:36 +0000] \"GET /healthz HTTP/1.1\" 404 153 \"-\" \"kube-probe/1.31\" \"-\"\n2026/10/30 20:19:39 [error] 35#35: *3 open() \"/usr/share/nginx/html/healthz\" failed (2: No such file or directory), client: 10.244.1.1, server: localhost, request: \"GET /healthz HTTP/1.1\", host: \"10.244.1.52:80\"\n10.244.1.1 - - [30/Oct/2026:20:19:39 +0000] \"GET /healthz HTTP/1.1\" 404 153 \"-\" \"kube-probe/1.31\" \"-\"\n10.244.1.1 - - [30/Oct/2026:20:19:44 +0000] \"GET /healthz HTTP/1.1\" 404 153 \"-\" \"kube-probe/1.31\" \"-\"\n2026/10/30 20:19:44 [error] 33#33: *4 open() \"/usr/share/nginx/html/healthz\" failed (2: No such file or directory), client: 10.244.1.1, server: localhost, request: \"GET /healthz HTTP/1.1\", host: \"10.244.1.52:80\"\n10.244.1.1 - - [30/Oct/2026:20:19:49 +0000] \"GET /healthz HTTP/1.1\" 404 153 \"-\" \"kube-probe/1.31\" \"-\"\n2026/10/30 20:19:49 [error] 33#33: *5 open() \"/usr/share/nginx/html/healthz\" failed (2: No such file or directory), client: 10.244.1.1, server: localhost, request: \"GET /healthz HTTP/1.1\", host: \"10.244.1.52:80\"\n2026/10/30 20:19:54 [error] 33#33: *6 open() \"/usr/share/nginx/html/healthz\" failed (2: No such file or directory), client: 10.244.1.1, server: localhost, request: \"GET /healthz HTTP/1.1\", host: \"10.244.1.52:80\"\n10.244.1.1 - - [30/Oct/2026:20:19:54 +0000] \"GET /healthz HTTP/1.1\" 404 153 \"-\" \"kube-probe/1.31\" \"-\"\n2026/10/30 20:19:59 [error] 33#33: *7 open() \"/usr/share/nginx/html/healthz\" failed (2: No such file or directory), client: 10.244.1.1, server: localhost, request: \"GET /healthz HTTP/1.1\", host: \"10.244.1.52:80\"\n10.244.1.1 - - [30/Oct/2026:20:19:59 +0000] \"GET /healthz HTTP/1.1\" 404 153 \"-\" \"kube-probe/1.31\" \"-\"\n"
   }
  ],
  "errors": []

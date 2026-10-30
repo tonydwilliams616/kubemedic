@@ -20,8 +20,8 @@
     {
      "type": "Progressing",
      "status": "True",
-     "reason": "ReplicaSetUpdated",
-     "message": "ReplicaSet \"worker-5dc69c79ff\" is progressing."
+     "reason": "NewReplicaSetAvailable",
+     "message": "ReplicaSet \"worker-c75db4fdd\" has successfully progressed."
     }
    ],
    "containers": [
@@ -70,7 +70,7 @@
      ]
     },
     {
-     "revision": 15,
+     "revision": 19,
      "current": false,
      "change_cause": "cache size 16MB",
      "images": [
@@ -81,7 +81,7 @@
      ]
     },
     {
-     "revision": 16,
+     "revision": 20,
      "current": true,
      "change_cause": "cache size 200MB",
      "images": [
@@ -96,7 +96,7 @@
  ],
  "pods": [
   {
-   "name": "worker-5dc69c79ff-dtvtm",
+   "name": "worker-5dc69c79ff-8f52m",
    "owner": "worker-5dc69c79ff",
    "phase": "Running",
    "ready": "0/1",
@@ -108,7 +108,7 @@
      "restarts": 2,
      "state": {
       "waiting": "CrashLoopBackOff",
-      "message": "back-off 20s restarting failed container=worker pod=worker-5dc69c79ff-dtvtm_km-oom-killed(9ffc8a4e-e18a-4729-a219-d42bdee8b30c)"
+      "message": "back-off 20s restarting failed container=worker pod=worker-5dc69c79ff-8f52m_<namespace>(b805a964-5b50-4da6-b0d5-7ae4e827fba6)"
      },
      "last_terminated": {
       "reason": "OOMKilled",
@@ -130,7 +130,7 @@
    ]
   },
   {
-   "name": "worker-c75db4fdd-885kx",
+   "name": "worker-c75db4fdd-dbxpz",
    "owner": "worker-c75db4fdd",
    "phase": "Running",
    "ready": "1/1",
@@ -150,129 +150,80 @@
  ],
  "events": [
   {
-   "type": "Normal",
-   "reason": "Pulled",
-   "object": "Pod/worker-5dc69c79ff-xsqbk",
-   "count": 82,
-   "message": "Container image \"python:3.12-alpine\" already present on machine"
-  },
-  {
    "type": "Warning",
    "reason": "BackOff",
-   "object": "Pod/worker-5dc69c79ff-xsqbk",
-   "count": 1341,
-   "message": "Back-off restarting failed container worker in pod worker-5dc69c79ff-xsqbk_km-oom-killed(af6cddcc-89c3-4f62-8653-86770889bfcc)"
-  },
-  {
-   "type": "Normal",
-   "reason": "Scheduled",
-   "object": "Pod/worker-c75db4fdd-885kx",
-   "count": 1,
-   "message": "Successfully assigned km-oom-killed/worker-c75db4fdd-885kx to kubemedic-worker"
-  },
-  {
-   "type": "Normal",
-   "reason": "Pulled",
-   "object": "Pod/worker-c75db4fdd-885kx",
-   "count": 1,
-   "message": "Container image \"python:3.12-alpine\" already present on machine"
-  },
-  {
-   "type": "Normal",
-   "reason": "Created",
-   "object": "Pod/worker-c75db4fdd-885kx",
-   "count": 1,
-   "message": "Created container worker"
-  },
-  {
-   "type": "Normal",
-   "reason": "Started",
-   "object": "Pod/worker-c75db4fdd-885kx",
-   "count": 1,
-   "message": "Started container worker"
-  },
-  {
-   "type": "Normal",
-   "reason": "SuccessfulCreate",
-   "object": "ReplicaSet/worker-c75db4fdd",
-   "count": 1,
-   "message": "Created pod: worker-c75db4fdd-885kx"
-  },
-  {
-   "type": "Normal",
-   "reason": "ScalingReplicaSet",
-   "object": "Deployment/worker",
-   "count": 2,
-   "message": "Scaled up replica set worker-c75db4fdd to 1 from 0"
-  },
-  {
-   "type": "Normal",
-   "reason": "Scheduled",
-   "object": "Pod/worker-5dc69c79ff-dtvtm",
-   "count": 1,
-   "message": "Successfully assigned km-oom-killed/worker-5dc69c79ff-dtvtm to kubemedic-worker"
+   "object": "Pod/worker-5dc69c79ff-jtjhk",
+   "count": 371,
+   "message": "Back-off restarting failed container worker in pod worker-5dc69c79ff-jtjhk_<namespace>(96750c0f-40f2-4f9b-b1bd-3973649bca2d)"
   },
   {
    "type": "Normal",
    "reason": "SuccessfulDelete",
    "object": "ReplicaSet/worker-5dc69c79ff",
    "count": 1,
-   "message": "Deleted pod: worker-5dc69c79ff-xsqbk"
+   "message": "Deleted pod: worker-5dc69c79ff-jtjhk"
+  },
+  {
+   "type": "Normal",
+   "reason": "ScalingReplicaSet",
+   "object": "Deployment/worker",
+   "count": 4,
+   "message": "Scaled down replica set worker-5dc69c79ff to 0 from 1"
+  },
+  {
+   "type": "Normal",
+   "reason": "Scheduled",
+   "object": "Pod/worker-5dc69c79ff-8f52m",
+   "count": 1,
+   "message": "Successfully assigned <namespace>/worker-5dc69c79ff-8f52m to kubemedic-worker"
   },
   {
    "type": "Normal",
    "reason": "SuccessfulCreate",
    "object": "ReplicaSet/worker-5dc69c79ff",
    "count": 1,
-   "message": "Created pod: worker-5dc69c79ff-dtvtm"
+   "message": "Created pod: worker-5dc69c79ff-8f52m"
   },
   {
    "type": "Normal",
    "reason": "ScalingReplicaSet",
    "object": "Deployment/worker",
-   "count": 2,
-   "message": "Scaled down replica set worker-5dc69c79ff to 0 from 1"
-  },
-  {
-   "type": "Normal",
-   "reason": "ScalingReplicaSet",
-   "object": "Deployment/worker",
-   "count": 2,
+   "count": 4,
    "message": "Scaled up replica set worker-5dc69c79ff to 1 from 0"
   },
   {
    "type": "Normal",
    "reason": "Pulled",
-   "object": "Pod/worker-5dc69c79ff-dtvtm",
+   "object": "Pod/worker-5dc69c79ff-8f52m",
    "count": 3,
    "message": "Container image \"python:3.12-alpine\" already present on machine"
   },
   {
    "type": "Normal",
    "reason": "Created",
-   "object": "Pod/worker-5dc69c79ff-dtvtm",
+   "object": "Pod/worker-5dc69c79ff-8f52m",
    "count": 3,
    "message": "Created container worker"
   },
   {
    "type": "Normal",
    "reason": "Started",
-   "object": "Pod/worker-5dc69c79ff-dtvtm",
+   "object": "Pod/worker-5dc69c79ff-8f52m",
    "count": 3,
    "message": "Started container worker"
   },
   {
    "type": "Warning",
    "reason": "BackOff",
-   "object": "Pod/worker-5dc69c79ff-dtvtm",
+   "object": "Pod/worker-5dc69c79ff-8f52m",
    "count": 3,
-   "message": "Back-off restarting failed container worker in pod worker-5dc69c79ff-dtvtm_km-oom-killed(9ffc8a4e-e18a-4729-a219-d42bdee8b30c)"
+   "message": "Back-off restarting failed container worker in pod worker-5dc69c79ff-8f52m_<namespace>(b805a964-5b50-4da6-b0d5-7ae4e827fba6)"
   }
  ],
  "configmaps": [],
  "logs": [
   {
-   "pod": "worker-5dc69c79ff-dtvtm",
+   "pod": "worker-5dc69c79ff-8f52m",
    "container": "worker",
    "previous": false,
    "ok": true,
@@ -280,7 +231,7 @@
    "text": ""
   },
   {
-   "pod": "worker-5dc69c79ff-dtvtm",
+   "pod": "worker-5dc69c79ff-8f52m",
    "container": "worker",
    "previous": true,
    "ok": true,

@@ -77,7 +77,7 @@
    "type": "Warning",
    "reason": "FailedScheduling",
    "object": "Pod/reports-9674975f4-4jvq4",
-   "count": 296,
+   "count": 336,
    "message": "0/2 nodes are available: 1 Insufficient cpu, 1 node(s) had untolerated taint {node-role.kubernetes.io/control-plane: }. preemption: 0/2 nodes are available: 1 No preemption victims found for incoming pod, 1 Preemption is not helpful for scheduling."
   }
  ],

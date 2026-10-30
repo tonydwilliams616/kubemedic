@@ -26,7 +26,7 @@ import jsonschema
 from .evidence import (
     LOG_TAIL_LINES, MAX_LOG, AgentKubectl, configmap_keys, summarise_deployment, summarise_events, summarise_pod,
 )
-from .redact import cap, redact
+from .redact import blind_namespace, cap, redact
 
 MAX_RESULT_CHARS = 6000          # per tool result: big enough for a deployment, small enough to keep costs down
 # A Kubernetes object name (RFC 1123). It can't start with "-", so it can never become a kubectl flag.
@@ -137,6 +137,7 @@ class Toolbox:
             result = getattr(self, f"_{name}")(**args)
         except ToolError as e:
             result = {"error": str(e)}
+        result = blind_namespace(result, self.ns)   # e.g. event messages name the pod as <pod>_<namespace>
         text = json.dumps(result)
         if len(text) > MAX_RESULT_CHARS:
             result = {"truncated_to_chars": MAX_RESULT_CHARS, "partial_json": text[:MAX_RESULT_CHARS]}

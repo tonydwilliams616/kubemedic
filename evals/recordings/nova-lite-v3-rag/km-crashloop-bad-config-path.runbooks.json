@@ -1,14 +1,14 @@
 [
  {
   "id": "crashloopbackoff",
-  "score": 0.53
+  "score": 0.508
  },
  {
   "id": "oomkilled",
-  "score": 0.432
+  "score": 0.422
  },
  {
   "id": "liveness-probe-restarts",
-  "score": 0.423
+  "score": 0.42
  }
 ]
