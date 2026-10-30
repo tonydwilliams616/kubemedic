@@ -129,6 +129,17 @@ def test_runbook_tools_only_exist_with_a_retriever_and_track_pages_read():
     assert tb.runbooks_read == ["oomkilled"]
 
 
-def test_bedrock_spec_shape():
-    spec = toolbox().bedrock_specs()[0]["toolSpec"]
-    assert set(spec) == {"name", "description", "inputSchema"} and spec["inputSchema"]["json"]["type"] == "object"
+def test_bedrock_spec_shape_shows_nova_only_what_it_supports():
+    specs = [s["toolSpec"] for s in toolbox().bedrock_specs()]
+    assert all(set(s) == {"name", "description", "inputSchema"} for s in specs)
+    for s in specs:
+        top = s["inputSchema"]["json"]
+        assert top["type"] == "object" and set(top) <= {"type", "properties", "required"}
+        assert all("pattern" not in p for p in top.get("properties", {}).values())
+
+
+def test_the_advertised_schema_is_looser_but_the_enforced_one_still_blocks():
+    tb = toolbox()
+    shown = next(s for s in tb.bedrock_specs() if s["toolSpec"]["name"] == "get_deployment")
+    assert "pattern" not in shown["toolSpec"]["inputSchema"]["json"]["properties"]["name"]
+    assert "invalid arguments" in tb.call("get_deployment", {"name": "--all-namespaces"})["error"]

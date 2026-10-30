@@ -89,6 +89,26 @@ SPECS: dict[str, dict] = {
 RUNBOOK_TOOLS = {"search_runbooks", "read_runbook"}
 
 
+def advertised(schema: dict) -> dict:
+    """The simpler schema we SHOW the model; the strict one in SPECS is what we ENFORCE.
+
+    Amazon Nova accepts only `type`, `properties` and `required` at the top level of a tool schema
+    (`additionalProperties` makes it ignore the tool), so the strict parts are kept for our own
+    validation in Toolbox.call, which is the check that actually protects the cluster.
+    """
+    keep = ("type", "description", "enum", "items", "properties", "required")
+    out = {k: v for k, v in schema.items() if k in keep}
+    if "properties" in out:
+        out["properties"] = {name: advertised(p) for name, p in out["properties"].items()}
+    if "items" in out:
+        out["items"] = advertised(out["items"])
+    return out
+
+
+def bedrock_spec(name: str, description: str, schema: dict) -> dict:
+    return {"toolSpec": {"name": name, "description": description, "inputSchema": {"json": advertised(schema)}}}
+
+
 class Toolbox:
     """All the tools, pinned to one namespace. `call(name, args)` is the only way in."""
 
@@ -103,8 +123,7 @@ class Toolbox:
 
     def bedrock_specs(self) -> list[dict]:
         """The tool list in the shape the Bedrock Converse API expects (toolConfig.tools)."""
-        return [{"toolSpec": {"name": n, "description": SPECS[n]["description"],
-                              "inputSchema": {"json": SPECS[n]["schema"]}}} for n in self.names]
+        return [bedrock_spec(n, SPECS[n]["description"], SPECS[n]["schema"]) for n in self.names]
 
     def call(self, name: str, args: dict | None) -> dict:
         args = args or {}

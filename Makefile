@@ -10,7 +10,7 @@ RAG      ?=
 RECORDING ?= evals/recordings/nova-lite-v3-rag
 LAB      := $(PYTHON) -m lab --context $(CONTEXT)
 
-.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose eval eval-retrieval record eval-replay tracking-setup mlflow-ui track-reports validate test lint
+.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose investigate eval eval-retrieval record eval-replay tracking-setup mlflow-ui track-reports validate test lint
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
@@ -62,6 +62,10 @@ search: ## Show which runbooks the agent would retrieve: make search SCENARIO=oo
 diagnose: ## Ask the LLM to diagnose a scenario: make diagnose SCENARIO=oom-killed [MODEL=<id>] [RAG=1]
 	@test -n "$(SCENARIO)" || (echo "SCENARIO is required" && exit 1)
 	$(PYTHON) -m kubemedic.diagnose --namespace km-$(SCENARIO) --context $(CONTEXT) $(if $(MODEL),--model $(MODEL)) $(if $(RAG),--rag)
+
+investigate: ## Let the tool-using agent investigate a scenario step by step: make investigate SCENARIO=oom-killed [MODEL=<id>] [RAG=1]
+	@test -n "$(SCENARIO)" || (echo "SCENARIO is required" && exit 1)
+	$(PYTHON) -m kubemedic.agent --namespace km-$(SCENARIO) --context $(CONTEXT) $(if $(MODEL),--model $(MODEL)) $(if $(RAG),--rag)
 
 eval: ## Score the diagnoser on every broken scenario: make eval [MODEL=<id>] [REPEATS=3] [RAG=1]
 	$(PYTHON) -m evals.run --context $(CONTEXT) --repeats $(REPEATS) $(if $(MODEL),--model $(MODEL)) $(if $(RAG),--rag)

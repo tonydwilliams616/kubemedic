@@ -26,6 +26,7 @@ from .contract import ACTIONS, validate, validate_citations
 
 DEFAULT_MODEL = os.environ.get("KUBEMEDIC_MODEL", "us.amazon.nova-lite-v1:0")
 MAX_OUTPUT_TOKENS = 1000
+AGENT_MAX_OUTPUT_TOKENS = 3000   # tool calls carry reasoning plus JSON arguments; too low a cap makes Nova error
 
 # Bump this whenever SYSTEM_PROMPT changes, so every eval result says which prompt produced it.
 # v1: first baseline. v2: mitigation vs permanent fix; rollback tied to the latest revision; explain the mechanism.
@@ -107,6 +108,26 @@ class BedrockModel:
         usage = resp.get("usage", {})
         return text, {"input_tokens": usage.get("inputTokens", 0), "output_tokens": usage.get("outputTokens", 0)}
 
+    def converse_tools(self, system: str, messages: list[dict], tools: list[dict]) -> tuple[list[dict], dict]:
+        """One agent step: the model may answer with tool calls. Returns (content blocks, token usage).
+
+        toolChoice "any" means every reply must call a tool, so the model can't drift into chat;
+        it finishes by calling submit_diagnosis. Nova calls tools most reliably with greedy
+        decoding (temperature 0 and topK 1), per AWS's Nova tool-use troubleshooting guide.
+        """
+        extra = {"additionalModelRequestFields": {"inferenceConfig": {"topK": 1}}} if "nova" in self.model_id else {}
+        resp = self.client.converse(
+            modelId=self.model_id,
+            system=[{"text": system}],
+            messages=messages,
+            toolConfig={"tools": tools, "toolChoice": {"any": {}}},
+            inferenceConfig={"maxTokens": AGENT_MAX_OUTPUT_TOKENS, "temperature": 0},
+            **extra,
+        )
+        usage = resp.get("usage", {})
+        return resp["output"]["message"]["content"], {"input_tokens": usage.get("inputTokens", 0),
+                                                      "output_tokens": usage.get("outputTokens", 0)}
+
 
 @dataclass
 class Result:
@@ -121,6 +142,9 @@ class Result:
     latency_s: float = 0.0
     guardrail_violations: list[str] = field(default_factory=list)  # every rule break seen, even if repaired
     overridden: bool = False   # True if a guardrail replaced the model's action with escalate
+    steps: int = 0                                             # agent only: model calls made
+    tool_calls: list[dict] = field(default_factory=list)      # agent only: every tool call, in order
+    trace: list[dict] = field(default_factory=list)           # agent only: what it thought and did, step by step
 
 
 def parse_json(text: str) -> object:
