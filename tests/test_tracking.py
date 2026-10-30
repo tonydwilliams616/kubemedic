@@ -77,6 +77,13 @@ def test_log_eval_creates_the_experiment_and_logs_everything():
     assert fake.logged["params"]["embed_model"] == "titan" and "git_commit" in fake.logged["params"]
     assert fake.logged["run_name"] == "20261030-run" and fake.logged["artifacts"] == str(out)
     assert fake.logged["uri"].startswith("sqlite:///")
+    assert fake.logged["tags"]["backfilled"] == "false"
+
+
+def test_backfilled_runs_do_not_claim_todays_git_commit():
+    fake = FakeMlflow()
+    log_eval(SUMMARY, Path(tempfile.mkdtemp()), mlflow=fake, backfilled=True)
+    assert fake.logged["params"]["git_commit"] == "unknown" and fake.logged["tags"]["backfilled"] == "true"
 
 
 def test_tracking_can_be_switched_off():

@@ -89,8 +89,13 @@ def retrieval_record(summary: dict) -> tuple[dict, dict]:
     return params, metrics
 
 
-def log_eval(summary: dict, out_dir: Path, extra_params: dict | None = None, mlflow=None) -> str | None:
-    """Log one eval run. Returns the MLflow run id, or None if tracking is off or unavailable."""
+def log_eval(summary: dict, out_dir: Path, extra_params: dict | None = None, mlflow=None,
+             backfilled: bool = False) -> str | None:
+    """Log one eval run. Returns the MLflow run id, or None if tracking is off or unavailable.
+
+    backfilled=True is for runs made before tracking existed: today's git commit didn't produce
+    them, so the commit is recorded as unknown rather than a misleading one.
+    """
     if os.environ.get("KUBEMEDIC_TRACKING", "on").lower() == "off":
         return None
     if mlflow is None:
@@ -102,7 +107,8 @@ def log_eval(summary: dict, out_dir: Path, extra_params: dict | None = None, mlf
 
     kind = "retrieval" if "hit@1" in summary else "diagnosis"
     params, metrics = retrieval_record(summary) if kind == "retrieval" else diagnosis_record(summary, load_pricing())
-    params |= git_info() | (extra_params or {})
+    code = {"git_commit": "unknown", "git_dirty": "unknown"} if backfilled else git_info()
+    params |= code | (extra_params or {})
 
     mlflow.set_tracking_uri(TRACKING_URI)
     name = f"kubemedic-{kind}"
@@ -112,7 +118,7 @@ def log_eval(summary: dict, out_dir: Path, extra_params: dict | None = None, mlf
     with mlflow.start_run(run_name=out_dir.name) as run:
         mlflow.log_params(params)
         mlflow.log_metrics(metrics)
-        mlflow.set_tags({"report_dir": str(out_dir), "kind": kind})
+        mlflow.set_tags({"report_dir": str(out_dir), "kind": kind, "backfilled": str(backfilled).lower()})
         mlflow.log_artifacts(str(out_dir))
         return run.info.run_id
 
@@ -127,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
         if not summary_file.is_file():
             print(f"skip {d}: no summary.json", file=sys.stderr)
             continue
-        run_id = log_eval(json.loads(summary_file.read_text()), d)
+        run_id = log_eval(json.loads(summary_file.read_text()), d, backfilled=True)
         print(f"logged {d} -> {run_id}")
     return 0
 
