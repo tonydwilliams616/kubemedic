@@ -47,9 +47,24 @@ make evidence SCENARIO=oom-killed                 # exactly what the model will 
 make diagnose SCENARIO=oom-killed                 # one diagnosis, with tokens and latency
 make eval                                         # every scenario x 3, scored; results in reports/
 make eval MODEL=us.anthropic.claude-sonnet-5-5    # any Bedrock model ID
+make eval RAG=1                                   # with retrieved runbooks and citations (prompt v3)
+make eval-retrieval                               # score runbook search alone, no LLM
 ```
 
-A full eval (18 calls) on Amazon Nova Lite costs a few pence.
+A full eval (18 diagnoses) on Amazon Nova Lite costs under 1 US cent.
+
+### Track and compare runs (MLflow)
+
+```bash
+make tracking-setup     # optional: installs MLflow
+make track-reports      # log report folders made before tracking was installed
+make mlflow-ui          # dashboard at http://localhost:5000
+```
+
+Every eval run is logged automatically: model, prompt version, RAG on/off and git commit (params);
+pass rate, safety, citations, tokens, latency and estimated cost (metrics); and the full report
+folder (artifacts). Storage is a local SQLite database in `.mlflow/`. Prices come from
+[evals/pricing.yaml](evals/pricing.yaml).
 
 ## Scenarios
 
@@ -68,6 +83,34 @@ See [scenarios/README.md](scenarios/README.md) for the format and [ADR 0001](doc
 
 Amazon Nova Lite (`us.amazon.nova-lite-v1:0`), 6 scenarios × 3 repeats, temperature 0.
 
+### Latest: RAG and guardrails (same cluster, same day)
+
+| Run | Pass | Root cause | Action | Unsafe | Citations | Tokens / diagnosis | Cost / diagnosis |
+|---|---|---|---|---|---|---|---|
+| v2 (no runbooks) | 67% | 78% | 89% | 2 | n/a | 1,926 | $0.00015 |
+| v3 + RAG | 78% | 94% | 83% | 3 | 100% | 5,327 | $0.00037 |
+| v3 + RAG + guardrail | **100%** | **100%** | **100%** | **0** | **100%** | 5,163 | $0.00036 |
+
+![MLflow comparison of v2, v3 + RAG and v3 + RAG + guardrail](docs/images/mlflow-compare.png)
+
+**What this shows:**
+- *Runbooks made the diagnosis better and the actions worse.* Root cause rose from 78% to 94%, but unsafe actions rose too: the model applied a runbook's "roll back" advice without checking that an earlier revision existed.
+- *A code guardrail fixed what the prompt couldn't.* A rollback with nothing to roll back to is now blocked and turned into "escalate" (fail closed). In this run the model escalated on its own, so the guardrail never had to fire, but it is there for when the model doesn't.
+- *RAG costs about 2.7× the tokens; the guardrail costs nothing.* The runbooks add text to every prompt; the guardrail is plain code.
+- *The eval set is now saturated* (100% on everything), so it can no longer tell a better model from a worse one. Harder, held-out scenarios come next.
+
+### Runbook search
+
+| hit@1 | hit@3 | MRR | Smallest margin |
+|---|---|---|---|
+| 83% | 100% | 0.92 | 0.064 |
+
+hit@1: the right runbook ranked first. hit@3: it was in the top 3 the model is shown. MRR: 1/rank averaged (1.0 = always first). Margin: how far ahead the top result was. The miss is `oom-killed`, ranked second behind the crash-loop runbook because the evidence is full of restart events.
+
+![MLflow retrieval metrics](docs/images/retrieval-metrics.png)
+
+### First prompts (28 October)
+
 | Prompt | Pass | Root cause | Action | Unsafe | Invalid |
 |---|---|---|---|---|---|
 | v1 | 33% | 56% | 61% | **0** | 0 |
@@ -80,7 +123,7 @@ Amazon Nova Lite (`us.amazon.nova-lite-v1:0`), 6 scenarios × 3 repeats, tempera
 
 **What's still weak:** root cause depth. The model finds the symptom but often misses the mechanism; for example, it never spots that `unschedulable-requests` asks for 64 whole CPUs.
 
-**Caveats:** 18 runs is a small sample (one run ≈ 5.5 points). v2 changed the prompt and the evidence together, so their effects aren't separated. Root cause is graded by keyword matching, which is cheap and repeatable but checks which facts are mentioned, not the quality of the reasoning.
+**Caveats:** 18 runs is a small sample (one run ≈ 5.5 points). v2 scored differently on 28 and 30 October (root cause 67% vs 78%, action 100% vs 89%) even at temperature 0, which is why every comparison above uses runs from the same day and cluster. v2 changed the prompt and the evidence together, so their effects aren't separated. Root cause is graded by keyword matching, which is cheap and repeatable but checks which facts are mentioned, not the quality of the reasoning.
 
 ## Safety built in from day one
 
@@ -90,7 +133,9 @@ Amazon Nova Lite (`us.amazon.nova-lite-v1:0`), 6 scenarios × 3 repeats, tempera
 - The agent's ServiceAccount is read-only and bound only in `km-*` namespaces: no Secrets, no `exec`, no writes, nothing in `kube-system` (`make rbac-check` proves it in CI).
 - Logs, env vars and events are redacted before reaching the LLM; ConfigMaps are reduced to key names.
 - Cluster data is fenced in the prompt as untrusted, so instructions planted in logs are ignored. The real guarantee comes in Phase 3: the executor will accept only allowlisted actions, whatever the model says.
-- The model only proposes; nothing in Phase 1 can change the cluster.
+- Deterministic guardrails check every proposed action against the evidence (for example, a rollback needs an earlier revision) and fail closed to "escalate".
+- Runbook citations are checked in code: the model may only cite pages it was actually shown.
+- The model only proposes; nothing can change the cluster yet.
 
 ## Layout
 
@@ -100,7 +145,8 @@ scenarios/<id>/           base.yaml (optional), break.yaml, expected.yaml (the a
 lab/                      Python CLI: validate, break, check, reset
 deploy/agent/rbac.yaml    the agent's read-only identity
 kubemedic/                the agent: contract, redaction, evidence, diagnosis
-evals/                    scorer and eval runner
+runbooks/                 symptom-first runbooks the agent retrieves and cites
+evals/                    scorers, eval runners, MLflow tracking, model prices
 tests/                    unit tests (no cluster or AWS needed)
 .github/workflows/ci.yaml lint + tests, then break, check, RBAC-check and evidence on a live kind cluster
 ```
@@ -111,8 +157,8 @@ tests/                    unit tests (no cluster or AWS needed)
 |---|---|
 | 0 | Fault-injection lab and verified scenarios ✅ |
 | 1 | Read-only diagnoser on Amazon Bedrock and an eval harness ✅ |
-| 2 | RAG over symptom-first runbooks: retrieval eval, citations, with vs without comparison ← *here* |
-| 3 | Experiment tracking with MLflow; evals as a CI gate (recorded model answers replayed on every PR) |
+| 2 | RAG over symptom-first runbooks: retrieval eval, citations, with vs without comparison ✅ |
+| 3 | Experiment tracking with MLflow ✅; evals as a CI gate (recorded model answers replayed on every PR) ← *here* |
 | 4 | Tool-using agent: the model chooses what to inspect next, step by step, instead of one fixed bundle |
 | 5 | Allowlisted remediation executor with its own identity, human approval and an audit log |
 | 6 | Self-hosted open model on EKS: Karpenter GPU nodes, vLLM serving, scale to zero; accuracy, latency and cost per diagnosis compared with Bedrock |

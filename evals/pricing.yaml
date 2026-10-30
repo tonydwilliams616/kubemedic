@@ -1,0 +1,12 @@
+# Bedrock on-demand prices used to estimate the cost of each eval run (US dollars per 1 million tokens).
+#
+# Prices change: check https://aws.amazon.com/bedrock/pricing/ before quoting a cost anywhere.
+# Checked 2026-10-30 against modelcompare.dev (Nova) and the Claude pricing page (Claude).
+# Claude via a "us." regional profile carries a 10% premium over global endpoints, included below.
+# A model missing from this list simply gets no cost metric.
+models:
+  us.amazon.nova-micro-v1:0:     {input_per_million: 0.035, output_per_million: 0.14}
+  us.amazon.nova-lite-v1:0:      {input_per_million: 0.06,  output_per_million: 0.24}
+  us.amazon.nova-pro-v1:0:       {input_per_million: 0.80,  output_per_million: 3.20}
+  us.anthropic.claude-haiku-5-5: {input_per_million: 0.11,  output_per_million: 0.55}
+  us.anthropic.claude-sonnet-5-5: {input_per_million: 2.20, output_per_million: 11.00}

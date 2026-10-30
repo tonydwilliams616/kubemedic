@@ -105,6 +105,8 @@ def main(argv: list[str] | None = None) -> int:
     (out / "summary.json").write_text(json.dumps(result, indent=2))
     print_report(result)
     print(f"\nfull results: {out}/summary.json")
+    from .run import _track
+    _track(result, out, None)
     if args.min_hit3 is not None and result["hit@3"] < args.min_hit3:
         print(f"FAIL: hit@3 {result['hit@3']} is below the minimum {args.min_hit3}", file=sys.stderr)
         return 1

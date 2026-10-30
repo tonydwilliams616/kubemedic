@@ -9,3 +9,6 @@ reports/
 *.kubeconfig
 aws-login.sh
 .cache/
+.mlflow/
+mlflow.db
+mlruns/

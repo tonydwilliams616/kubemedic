@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Callable
 
 from kubemedic.diagnose import DEFAULT_MODEL, PROMPT_VERSION, RAG_PROMPT_VERSION, diagnose
+from kubemedic.retrieve import EMBED_MODEL
 from lab import scenarios
 from lab.scenarios import Scenario
 
@@ -178,7 +179,19 @@ def main(argv: list[str] | None = None) -> int:
 
     print_scorecard(summary)
     print(f"\nfull results: {out_dir}/")
+    _track(summary, out_dir, {"embed_model": EMBED_MODEL} if args.rag else None)
     return 0
+
+
+def _track(summary: dict, out_dir: Path, extra: dict | None) -> None:
+    """Log the run to MLflow; a tracking problem must never fail an eval that already ran."""
+    from .tracking import log_eval
+    try:
+        run_id = log_eval(summary, out_dir, extra)
+        if run_id:
+            print(f"tracked in MLflow: run {run_id} (make mlflow-ui)")
+    except Exception as e:  # noqa: BLE001
+        print(f"warning: MLflow tracking failed: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":

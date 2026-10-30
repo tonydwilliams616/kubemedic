@@ -2,6 +2,7 @@
 import math
 import re
 import tempfile
+import zlib
 from pathlib import Path
 
 from kubemedic.retrieve import build_index, cosine, query_text, search
@@ -19,7 +20,7 @@ class WordEmbedder:
         self.calls += 1
         v = [0.0] * 64
         for w in re.findall(r"[a-z0-9]+", text.lower()):
-            v[hash(w) % 64] += 1
+            v[zlib.crc32(w.encode()) % 64] += 1   # crc32, not hash(): hash() changes every run, which made these tests flaky
         n = math.sqrt(sum(x * x for x in v)) or 1
         return [x / n for x in v]
 

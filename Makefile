@@ -9,7 +9,7 @@ REPEATS  ?= 3
 RAG      ?=
 LAB      := $(PYTHON) -m lab --context $(CONTEXT)
 
-.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose eval eval-retrieval validate test lint
+.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose eval eval-retrieval tracking-setup mlflow-ui track-reports validate test lint
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
@@ -67,6 +67,15 @@ eval: ## Score the diagnoser on every broken scenario: make eval [MODEL=<id>] [R
 
 eval-retrieval: ## Score runbook search alone (no LLM) on every broken scenario
 	$(PYTHON) -m evals.retrieval --context $(CONTEXT)
+
+tracking-setup: ## Install MLflow (optional) so every eval run is logged to .mlflow/
+	$(PYTHON) -m pip install -r requirements-tracking.txt
+
+mlflow-ui: ## Open the MLflow dashboard at http://localhost:5000 to compare eval runs
+	$(PYTHON) -m mlflow ui --backend-store-uri sqlite:///.mlflow/mlflow.db --port 5000
+
+track-reports: ## Log report folders made before tracking existed: make track-reports [REPORTS="reports/a reports/b"]
+	$(PYTHON) -m evals.tracking $(or $(REPORTS),$(wildcard reports/*))
 
 validate: ## Validate scenario definitions (and manifests, if kubeconform is installed)
 	$(PYTHON) -m lab validate
