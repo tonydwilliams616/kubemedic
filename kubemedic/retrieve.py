@@ -153,6 +153,20 @@ def search(index: Index, embedder: Embedder, text: str, k: int = 3) -> list[dict
     return [{"id": i, "title": t, "score": round(cosine(q, v), 3)} for i, t, v in scored[:k]]
 
 
+class Retriever:
+    """Builds the index once, then returns the top-k runbook pages (with text) for any bundle."""
+
+    def __init__(self, embedder: Embedder | None = None, runbooks: list[Runbook] | None = None):
+        self.embedder = embedder or TitanEmbedder()
+        self.runbooks = {rb.id: rb for rb in (runbooks if runbooks is not None else load_all())}
+        self.index = build_index(self.embedder, list(self.runbooks.values()),
+                                 cache_dir=CACHE_DIR if runbooks is None else None)
+
+    def top_runbooks(self, bundle: dict, k: int = 3) -> list[dict]:
+        hits = search(self.index, self.embedder, query_text(bundle), k)
+        return [{"id": h["id"], "title": h["title"], "score": h["score"],
+                 "body": self.runbooks[h["id"]].body} for h in hits]
+
 def main(argv: list[str] | None = None) -> int:
     from botocore.exceptions import BotoCoreError, ClientError
 

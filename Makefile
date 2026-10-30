@@ -6,6 +6,7 @@ CLUSTER  ?= kubemedic
 CONTEXT  := kind-$(CLUSTER)
 SCENARIO ?=
 REPEATS  ?= 3
+RAG      ?=
 LAB      := $(PYTHON) -m lab --context $(CONTEXT)
 
 .PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose eval eval-retrieval validate test lint
@@ -57,12 +58,12 @@ search: ## Show which runbooks the agent would retrieve: make search SCENARIO=oo
 	@test -n "$(SCENARIO)" || (echo "SCENARIO is required" && exit 1)
 	$(PYTHON) -m kubemedic.retrieve --namespace km-$(SCENARIO) --context $(CONTEXT)
 
-diagnose: ## Ask the LLM to diagnose a scenario: make diagnose SCENARIO=oom-killed [MODEL=<bedrock model id>]
+diagnose: ## Ask the LLM to diagnose a scenario: make diagnose SCENARIO=oom-killed [MODEL=<id>] [RAG=1]
 	@test -n "$(SCENARIO)" || (echo "SCENARIO is required" && exit 1)
-	$(PYTHON) -m kubemedic.diagnose --namespace km-$(SCENARIO) --context $(CONTEXT) $(if $(MODEL),--model $(MODEL))
+	$(PYTHON) -m kubemedic.diagnose --namespace km-$(SCENARIO) --context $(CONTEXT) $(if $(MODEL),--model $(MODEL)) $(if $(RAG),--rag)
 
-eval: ## Score the diagnoser on every broken scenario: make eval [MODEL=<id>] [REPEATS=3]
-	$(PYTHON) -m evals.run --context $(CONTEXT) --repeats $(REPEATS) $(if $(MODEL),--model $(MODEL))
+eval: ## Score the diagnoser on every broken scenario: make eval [MODEL=<id>] [REPEATS=3] [RAG=1]
+	$(PYTHON) -m evals.run --context $(CONTEXT) --repeats $(REPEATS) $(if $(MODEL),--model $(MODEL)) $(if $(RAG),--rag)
 
 eval-retrieval: ## Score runbook search alone (no LLM) on every broken scenario
 	$(PYTHON) -m evals.retrieval --context $(CONTEXT)

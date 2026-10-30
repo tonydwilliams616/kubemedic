@@ -20,7 +20,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Callable
 
-from kubemedic.diagnose import DEFAULT_MODEL, PROMPT_VERSION, diagnose
+from kubemedic.diagnose import DEFAULT_MODEL, PROMPT_VERSION, RAG_PROMPT_VERSION, diagnose
 from lab import scenarios
 from lab.scenarios import Scenario
 
@@ -34,7 +34,9 @@ def score_row(s: Score) -> dict:
 
 
 def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict], repeats: int,
-             out_dir: Path, check_fn: Callable[[Scenario], tuple[bool, str]] | None = None) -> dict:
+             out_dir: Path, check_fn: Callable[[Scenario], tuple[bool, str]] | None = None,
+             retrieve_fn: Callable[[dict], list[dict]] | None = None) -> dict:
+    """retrieve_fn given = RAG run (prompt v3): pages are retrieved once per scenario, like the evidence."""
     # 1. Every fault must be really there before we spend anything on the model.
     if check_fn:
         not_ready = [(sc.id, detail) for sc in selected for ok, detail in [check_fn(sc)] if not ok]
@@ -51,9 +53,13 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict], 
     for sc in selected:
         bundle = gather_fn(sc.namespace)
         (out_dir / f"{sc.id}.bundle.json").write_text(json.dumps(bundle, indent=1))
+        pages = retrieve_fn(bundle) if retrieve_fn else None
+        if pages:
+            (out_dir / f"{sc.id}.runbooks.json").write_text(
+                json.dumps([{k: p[k] for k in ("id", "score")} for p in pages], indent=1))
         scores = []
         for r in range(1, repeats + 1):
-            result = diagnose(bundle, model)
+            result = diagnose(bundle, model, runbooks=pages)
             s = score(result.diagnosis, sc.spec)
             scores.append(s)
             tokens_in += result.input_tokens
@@ -69,12 +75,17 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict], 
             "action_ok": sum(s.action_ok for s in scores),
             "unsafe": sum(s.unsafe for s in scores),
             "actions": sorted({s.action or "invalid" for s in scores}),
+            "retrieved": [p["id"] for p in pages] if pages else None,
+            "cited_relevant": sum(bool(s.cited_relevant) for s in scores) if pages else None,
             "repeats": repeats,
         })
 
     summary = {
         "model": model.model_id,
-        "prompt_version": PROMPT_VERSION,
+        "prompt_version": RAG_PROMPT_VERSION if retrieve_fn else PROMPT_VERSION,
+        "rag": bool(retrieve_fn),
+        "citation_accuracy": (round(sum(bool(s.cited_relevant) for s in all_scores) / max(len(all_scores), 1), 2)
+                              if retrieve_fn else None),
         "repeats": repeats,
         "runs": len(all_scores),
         **summarise(all_scores),
@@ -95,8 +106,13 @@ def print_scorecard(summary: dict) -> None:
     for row in summary["per_scenario"]:
         print(f"{row['scenario']:<28} {row['passed']}/{n:<4} {row['root_cause_ok']}/{n:<4} "
               f"{row['action_ok']}/{n:<5} {row['unsafe']:<7} {', '.join(row['actions'])}")
+    if summary.get("rag"):
+        print("\nretrieved pages, and how often the right one was cited:")
+        for row in summary["per_scenario"]:
+            print(f"  {row['scenario']:<28} cited right page {row['cited_relevant']}/{n}   retrieved: {', '.join(row['retrieved'])}")
     print(f"\npass rate {summary['pass_rate']:.0%} | root cause {summary['root_cause_accuracy']:.0%} | "
-          f"action {summary['action_accuracy']:.0%} | UNSAFE {summary['unsafe']} | invalid {summary['invalid']}")
+          f"action {summary['action_accuracy']:.0%} | UNSAFE {summary['unsafe']} | invalid {summary['invalid']}"
+          + (f" | citations {summary['citation_accuracy']:.0%}" if summary.get("rag") else ""))
     print(f"tokens in/out {summary['input_tokens']}/{summary['output_tokens']} | "
           f"mean latency {summary['mean_latency_s']}s")
 
@@ -127,15 +143,21 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--repeats", type=int, default=3)
     p.add_argument("--scenario", action="append", help="limit to these scenario ids (repeatable)")
     p.add_argument("--context", default="kind-kubemedic")
+    p.add_argument("--rag", action="store_true", help="retrieve the top 3 runbooks per scenario (prompt v3)")
     args = p.parse_args(argv)
 
     selected = [scenarios.load(i) for i in args.scenario] if args.scenario else scenarios.load_all()
     safe_model = args.model.replace(":", "_").replace("/", "_")
-    out_dir = REPORTS_DIR / f"{time.strftime('%Y%m%d-%H%M%S')}-{safe_model}-prompt{PROMPT_VERSION}"
+    version = RAG_PROMPT_VERSION if args.rag else PROMPT_VERSION
+    out_dir = REPORTS_DIR / f"{time.strftime('%Y%m%d-%H%M%S')}-{safe_model}-prompt{version}"
 
     try:
+        retrieve_fn = None
+        if args.rag:
+            from kubemedic.retrieve import Retriever
+            retrieve_fn = Retriever().top_runbooks
         summary = run_eval(selected, BedrockModel(args.model), lambda ns: gather(ns, args.context),
-                           args.repeats, out_dir, _cluster_check(args.context))
+                           args.repeats, out_dir, _cluster_check(args.context), retrieve_fn)
     except RuntimeError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2

@@ -21,7 +21,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from typing import Protocol
 
-from .contract import ACTIONS, validate
+from .contract import ACTIONS, validate, validate_citations
 
 DEFAULT_MODEL = os.environ.get("KUBEMEDIC_MODEL", "us.amazon.nova-lite-v1:0")
 MAX_OUTPUT_TOKENS = 1000
@@ -29,6 +29,8 @@ MAX_OUTPUT_TOKENS = 1000
 # Bump this whenever SYSTEM_PROMPT changes, so every eval result says which prompt produced it.
 # v1: first baseline. v2: mitigation vs permanent fix; rollback tied to the latest revision; explain the mechanism.
 PROMPT_VERSION = "v2"
+# v3 = v2 plus retrieved runbook pages and required citations (used when runbooks are supplied).
+RAG_PROMPT_VERSION = "v3"
 
 SYSTEM_PROMPT = f"""You are kubemedic, a Kubernetes incident responder.
 
@@ -65,6 +67,18 @@ Reply with ONLY one JSON object, no prose and no code fences:
   "proposed_action": {{"action": one of {ACTIONS}, "target": "Deployment/<name>", "reason": "..."}},
   "confidence": "low" | "medium" | "high"}}"""
 
+
+# v3: the same instructions, plus a section on using the retrieved runbooks and citing them.
+SYSTEM_PROMPT_RAG = SYSTEM_PROMPT.replace("""Rules:
+1.""", """Runbooks:
+You are also given up to three runbook pages inside <runbooks>, retrieved because they look
+relevant. They describe symptoms, likely causes, how to confirm and which mitigations apply.
+- Use them to reason about the mechanism, but confirm every claim against the evidence. A page
+  being supplied does not mean it applies; the search can be wrong.
+- In "citations", list the ids of the pages you actually relied on (at least one).
+
+Rules:
+1.""").replace("""  "confidence": "low" | "medium" | "high"}}""", """  "confidence": "low" | "medium" | "high", "citations": ["<runbook id>", ...]}}""")
 
 class Model(Protocol):
     model_id: str
@@ -118,26 +132,37 @@ def parse_json(text: str) -> object:
         return json.loads(text[start:end + 1])
 
 
-def build_user_message(bundle: dict) -> str:
-    return ("Diagnose this namespace.\n<evidence>\n"
+def build_user_message(bundle: dict, runbooks: list[dict] | None = None) -> str:
+    pages = ""
+    if runbooks:
+        pages = "<runbooks>\n" + "\n".join(
+            f'<runbook id="{rb["id"]}">\n# {rb["title"]}\n{rb["body"]}\n</runbook>' for rb in runbooks
+        ) + "\n</runbooks>\n"
+    return ("Diagnose this namespace.\n" + pages + "<evidence>\n"
             + json.dumps(bundle, indent=1)
             + "\n</evidence>\nRemember: reply with the JSON object only.")
 
 
-def diagnose(bundle: dict, model: Model, max_repairs: int = 1) -> Result:
-    result = Result(model_id=model.model_id, diagnosis=None, valid=False)
-    messages = [{"role": "user", "content": [{"text": build_user_message(bundle)}]}]
+def diagnose(bundle: dict, model: Model, runbooks: list[dict] | None = None, max_repairs: int = 1) -> Result:
+    """Diagnose from the evidence; with runbooks, use prompt v3 and require valid citations."""
+    system = SYSTEM_PROMPT_RAG if runbooks else SYSTEM_PROMPT
+    allowed = [rb["id"] for rb in runbooks or []]
+    result = Result(model_id=model.model_id, diagnosis=None, valid=False,
+                    prompt_version=RAG_PROMPT_VERSION if runbooks else PROMPT_VERSION)
+    messages = [{"role": "user", "content": [{"text": build_user_message(bundle, runbooks)}]}]
     started = time.monotonic()
 
     for attempt in range(1 + max_repairs):
         result.attempts = attempt + 1
-        text, usage = model.converse(SYSTEM_PROMPT, messages)
+        text, usage = model.converse(system, messages)
         result.input_tokens += usage["input_tokens"]
         result.output_tokens += usage["output_tokens"]
 
         try:
             diag = parse_json(text)
             problems = validate(diag)
+            if runbooks and not problems:
+                problems = validate_citations(diag, allowed)
         except json.JSONDecodeError as e:
             diag, problems = None, [f"reply was not valid JSON: {e}"]
 
@@ -163,12 +188,18 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--namespace", "-n", required=True)
     p.add_argument("--context", default="kind-kubemedic")
     p.add_argument("--model", default=DEFAULT_MODEL, help=f"Bedrock model ID (default {DEFAULT_MODEL})")
+    p.add_argument("--rag", action="store_true", help="retrieve the top 3 runbooks and use prompt v3")
     args = p.parse_args(argv)
 
     from botocore.exceptions import BotoCoreError, ClientError
 
     try:
-        result = diagnose(gather(args.namespace, args.context), BedrockModel(args.model))
+        bundle = gather(args.namespace, args.context)
+        pages = None
+        if args.rag:
+            from .retrieve import Retriever
+            pages = Retriever().top_runbooks(bundle)
+        result = diagnose(bundle, BedrockModel(args.model), runbooks=pages)
     except BotoCoreError as e:   # login/credential problems
         print(f"AWS credentials problem: {e}\nFix: source ./aws-login.sh", file=sys.stderr)
         return 2

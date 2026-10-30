@@ -35,3 +35,12 @@ def validate(diag: object) -> list[str]:
     if diag.get("confidence") not in CONFIDENCE:
         problems.append(f"confidence must be one of {sorted(CONFIDENCE)}")
     return problems
+
+
+def validate_citations(diag: dict, allowed_ids: list[str]) -> list[str]:
+    """When runbooks were supplied, the answer must cite at least one of them and nothing else."""
+    cites = diag.get("citations")
+    if not isinstance(cites, list) or not cites or not all(isinstance(c, str) for c in cites):
+        return ["citations must be a non-empty list of runbook ids"]
+    invented = [c for c in cites if c not in allowed_ids]
+    return [f"citations not among the supplied runbooks: {invented}"] if invented else []
