@@ -8,7 +8,8 @@ SCENARIO ?=
 REPEATS  ?= 3
 RAG      ?=
 RECORDING ?= evals/recordings/nova-lite-v3-rag
-AGENT_RECORDING ?= evals/recordings/nova-lite-a1-rag
+# The agent's prompt version lives in the recording's meta.json, not in the folder name.
+AGENT_RECORDING ?= evals/recordings/nova-lite-agent-rag
 AGENT    ?=
 LAB      := $(PYTHON) -m lab --context $(CONTEXT)
 

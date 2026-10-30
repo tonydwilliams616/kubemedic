@@ -68,7 +68,7 @@ def diagnosis_record(summary: dict, pricing: dict) -> tuple[dict, dict]:
     metrics = {k: summary[k] for k in (
         "pass_rate", "root_cause_accuracy", "action_accuracy", "unsafe", "invalid",
         "citation_accuracy", "guardrail_blocks", "overrides", "model_action_accuracy",
-        "mean_steps", "mean_tool_calls", "budget_exhausted",
+        "mean_steps", "mean_tool_calls", "budget_exhausted", "repeated_calls",
         "input_tokens", "output_tokens", "mean_latency_s") if summary.get(k) is not None}
     metrics["tokens_per_diagnosis"] = round((summary["input_tokens"] + summary["output_tokens"]) / runs, 1)
     cost = estimate_cost(summary["model"], summary["input_tokens"], summary["output_tokens"], pricing)

@@ -1,11 +1,11 @@
 {
   "model": "us.amazon.nova-lite-v1:0",
-  "prompt_version": "a1-rag",
+  "prompt_version": "a2-rag",
   "evidence_version": "e2",
   "rag": true,
   "repeats": 3,
   "mode": "agent",
-  "recorded_at": "2026-10-30T20:57:06+0000",
+  "recorded_at": "2026-10-30T21:41:13+0000",
   "scenarios": [
     "bad-image-tag",
     "crashloop-bad-config-path",

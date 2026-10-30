@@ -140,6 +140,7 @@ Same six scenarios × 3, Nova Lite, runbooks on, namespace names hidden (evidenc
 |---|---|---|---|---|---|---|---|---|
 | One-shot v3 | **100%** | **100%** | 83% | **0** | **100%** | **5,200** | **$0.00036** | **2.4 s** |
 | Agent a1 | 72% | 78% | 78% | 4 | 67% | 26,100 | $0.0016 | 8.9 s |
+| Agent a2 | 83% | **100%** | **100%** | **0** | 89% | 24,100 | $0.0015 | 8.2 s |
 
 **The first agent lost on every measure.** The traces show why: in 4 of its 5 failures it never
 submitted an answer and ran out of its 12-step budget, going round in circles. On
@@ -148,11 +149,29 @@ two runbooks, then asked for the same logs again. On `oom-killed` it found the r
 step 7 and then re-read the same two pages until time ran out. With greedy decoding the same
 mistake repeats exactly, so the failures are fully reproducible.
 
-The one-shot diagnoser wins here because its evidence is gathered and curated by code up front;
+**a2 fixed the loops** with four changes aimed at what the traces showed: a step counter in the
+system prompt every step (our own channel; tool results are untrusted and could fake one), a
+forced `submit_diagnosis` on the last step (Bedrock `toolChoice`), repeated identical tool calls
+answered "you already asked this" instead of re-run, and a prompt note that pods that never
+started have no logs. No run ran out of budget, and the agent's **own** action choice reached
+100%: on `unschedulable-requests` it escalated by itself, where the one-shot model proposed an
+impossible rollback every time and needed the guardrail.
+
+**What still keeps a2 below the gate:**
+- *Grader, not agent:* all three `unschedulable-requests` runs found the cause ("CPU request of 64
+  is too high for any node", quoting "Insufficient cpu") but never used the word
+  Pending/Unschedulable, which the keyword check requires. The answer key is not changed to fit
+  model wording; an LLM-as-judge grader is the fix.
+- *Query formulation:* on `crashloop-bad-config-path` the agent searched the runbooks with its own
+  words ("config file not found") and found the ConfigMap/Secret page instead of the crash-loop
+  page. The one-shot path searches with a symptom summary written by code, which is more reliable.
+
+The one-shot diagnoser wins on accuracy and cost because its evidence is gathered and curated by code up front;
 the agent has to find the same facts itself, and a small model is weak at deciding when it has
 enough. An agent should pay off only when the evidence can't be gathered in advance.
 
-**Champion/challenger:** the one-shot diagnoser stays the gated production path. The agent's
+**Champion/challenger:** the one-shot diagnoser stays the gated production path; a2 is not
+promoted until it passes the same gate. The agent's
 recording is replayed in CI on every PR and its scores reported, but it doesn't block merges
 until it passes the gate itself.
 

@@ -136,6 +136,7 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict] |
         "mean_steps": round(sum(r.steps for r in all_results) / n, 1) if agent else None,
         "mean_tool_calls": round(sum(len(r.tool_calls) for r in all_results) / n, 1) if agent else None,
         "budget_exhausted": sum(any("budget exhausted" in p for p in r.problems) for r in all_results) if agent else None,
+        "repeated_calls": sum(r.repeated_calls for r in all_results) if agent else None,
         "input_tokens": tokens_in,
         "output_tokens": tokens_out,
         "mean_latency_s": round(sum(latencies) / max(len(latencies), 1), 2),
@@ -169,7 +170,7 @@ def print_scorecard(summary: dict) -> None:
               f"{summary['model_action_accuracy']:.0%}")
     if summary.get("mode") == "agent":
         print(f"agent: mean steps {summary['mean_steps']} | mean tool calls {summary['mean_tool_calls']} | "
-              f"ran out of budget {summary['budget_exhausted']}")
+              f"ran out of budget {summary['budget_exhausted']} | repeated questions {summary.get('repeated_calls')}")
     print(f"tokens in/out {summary['input_tokens']}/{summary['output_tokens']} | "
           f"mean latency {summary['mean_latency_s']}s")
 
