@@ -14,7 +14,11 @@ Design choices:
 - --agent scores the tool-using agent (kubemedic/agent.py) instead: it gathers its own evidence,
   so there is no bundle, and its recording is a tape of both sides of the conversation.
 
-Usage: python -m evals.run [--model MODEL_ID] [--repeats 3] [--scenario ID ...] [--rag] [--agent]
+- --judge grades each root cause with the calibrated LLM judge (evals/judge.py) instead of
+  keywords; verdicts are cached in evals/recordings/judge/, and --judge-offline (CI) uses only
+  the cache.
+
+Usage: python -m evals.run [--model MODEL_ID] [--repeats 3] [--scenario ID ...] [--rag] [--agent] [--judge]
        python -m evals.run --rag --record evals/recordings/<name>
        python -m evals.run --replay evals/recordings/<name> --gate evals/gate.yaml
 """
@@ -35,7 +39,7 @@ from lab import scenarios
 from lab.scenarios import Scenario
 
 from . import gate
-from .cassette import Player, Recorder, TapePlayer, TapeRecorder, read_meta
+from .cassette import JudgeCache, Player, Recorder, TapePlayer, TapeRecorder, read_meta
 from .score import Score, score, summarise
 
 REPORTS_DIR = Path("reports")
@@ -48,11 +52,15 @@ def score_row(s: Score) -> dict:
 def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict] | None, repeats: int,
              out_dir: Path, check_fn: Callable[[Scenario], tuple[bool, str]] | None = None,
              retrieve_fn: Callable[[dict], list[dict]] | None = None,
-             investigate_fn: Callable[[str], object] | None = None, agent_rag: bool = False) -> dict:
+             investigate_fn: Callable[[str], object] | None = None, agent_rag: bool = False,
+             judge_fn: Callable[[dict, dict], object] | None = None) -> dict:
     """retrieve_fn given = RAG run (prompt v3): pages are retrieved once per scenario, like the evidence.
 
     investigate_fn given = agent run: called once per repeat with the namespace; the agent gathers
     its own evidence with tools, so gather_fn and retrieve_fn are not used.
+
+    judge_fn given = each valid diagnosis's root cause is graded by the LLM judge: called with the
+    scenario's answer key and the diagnosis, it returns a judge Verdict.
     """
     agent = investigate_fn is not None
     rag = agent_rag if agent else bool(retrieve_fn)
@@ -68,6 +76,7 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict] |
     all_results = []
     per_scenario = []
     tokens_in = tokens_out = 0
+    judge_tokens, judge_errors = [0, 0], 0
     latencies = []
 
     for sc in selected:
@@ -84,12 +93,20 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict] |
             result = investigate_fn(sc.namespace) if agent else diagnose(bundle, model, runbooks=pages)
             results.append(result)
             s = score(result.diagnosis, sc.spec)
+            verdict = None
+            if judge_fn and s.valid:
+                verdict = judge_fn(sc.spec, result.diagnosis)
+                s.judge_verdict = verdict.correct      # None if the judge failed: keywords are used
+                judge_tokens[0] += verdict.input_tokens
+                judge_tokens[1] += verdict.output_tokens
+                judge_errors += verdict.correct is None
             scores.append(s)
             tokens_in += result.input_tokens
             tokens_out += result.output_tokens
             latencies.append(result.latency_s)
             (out_dir / f"{sc.id}.run{r}.json").write_text(
-                json.dumps({"result": asdict(result), "score": score_row(s)}, indent=2))
+                json.dumps({"result": asdict(result), "score": score_row(s),
+                            "judge": asdict(verdict) if verdict else None}, indent=2))
         all_scores += scores
         all_results += results
         read = sorted({c["args"]["id"] for res in results for c in res.tool_calls
@@ -98,6 +115,7 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict] |
             "scenario": sc.id,
             "passed": sum(s.passed for s in scores),
             "root_cause_ok": sum(s.root_cause_ok for s in scores),
+            "keyword_root_cause_ok": sum(s.keyword_root_cause_ok for s in scores),
             "action_ok": sum(s.action_ok for s in scores),
             "unsafe": sum(s.unsafe for s in scores),
             "actions": sorted({s.action or "invalid" for s in scores}),
@@ -137,6 +155,11 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict] |
         "mean_tool_calls": round(sum(len(r.tool_calls) for r in all_results) / n, 1) if agent else None,
         "budget_exhausted": sum(any("budget exhausted" in p for p in r.problems) for r in all_results) if agent else None,
         "repeated_calls": sum(r.repeated_calls for r in all_results) if agent else None,
+        "root_cause_grader": f"judge:{judge_fn.rubric}" if judge_fn else "keywords",
+        "judge_errors": judge_errors if judge_fn else None,
+        "judge_model": judge_fn.model_id if judge_fn else None,
+        "judge_input_tokens": judge_tokens[0] if judge_fn else None,
+        "judge_output_tokens": judge_tokens[1] if judge_fn else None,
         "input_tokens": tokens_in,
         "output_tokens": tokens_out,
         "mean_latency_s": round(sum(latencies) / max(len(latencies), 1), 2),
@@ -160,6 +183,11 @@ def print_scorecard(summary: dict) -> None:
         for row in summary["per_scenario"]:
             print(f"  {row['scenario']:<28} cited right page {row['cited_relevant']}/{n}   "
                   f"{label}: {', '.join(row['retrieved'] or []) or 'none'}")
+    grader = summary.get("root_cause_grader", "keywords")
+    if grader != "keywords":
+        print(f"\nroot cause graded by the LLM judge ({grader.split(':')[1]}): {summary['root_cause_accuracy']:.0%} "
+              f"| keywords would have said {summary['keyword_root_cause_accuracy']:.0%}"
+              + (f" | judge errors {summary['judge_errors']} (keywords used)" if summary.get("judge_errors") else ""))
     print(f"\npass rate {summary['pass_rate']:.0%} | root cause {summary['root_cause_accuracy']:.0%} | "
           f"action {summary['action_accuracy']:.0%} | UNSAFE {summary['unsafe']} | invalid {summary['invalid']}"
           + (f" | citations {summary['citation_accuracy']:.0%}" if summary.get("rag") else ""))
@@ -208,6 +236,9 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--replay", type=Path, metavar="DIR",
                       help="rerun a recording through the current code: no AWS, no cluster, no cost")
     p.add_argument("--gate", type=Path, metavar="FILE", help="exit 1 if the scores break the rules in FILE")
+    p.add_argument("--judge", action="store_true", help="grade root causes with the calibrated LLM judge")
+    p.add_argument("--judge-offline", action="store_true",
+                   help="with --judge: use only cached verdicts and never call the judge (CI)")
     args = p.parse_args(argv)
 
     selected = [scenarios.load(i) for i in args.scenario] if args.scenario else scenarios.load_all()
@@ -254,8 +285,13 @@ def main(argv: list[str] | None = None) -> int:
                 retrieve_fn = model.retrieving(retrieve_fn) if retrieve_fn else None
         safe_model = model.model_id.replace(":", "_").replace("/", "_")
         out_dir = REPORTS_DIR / f"{time.strftime('%Y%m%d-%H%M%S')}-{safe_model}-{label}"
+        cache = judge_fn = None
+        if args.judge:
+            cache, judge_fn = _judge(args.judge_offline)
         summary = run_eval(selected, model, gather_fn, repeats, out_dir, check_fn, retrieve_fn,
-                           investigate_fn, agent_rag)
+                           investigate_fn, agent_rag, judge_fn)
+        if cache:
+            cache.save()
     except RuntimeError as e:   # includes NotRecorded: replay hit something the recording lacks
         print(f"error: {e}", file=sys.stderr)
         return 2
@@ -286,6 +322,23 @@ def main(argv: list[str] | None = None) -> int:
 
 
 _REPLAYED_RUNBOOKS = object()   # stands in for a Retriever in agent replays; see main()
+
+
+def _judge(offline: bool):
+    """The judge as run_eval wants it: (answer key, diagnosis) -> Verdict, answering from the cache first."""
+    from .judge import JUDGE_MODEL, JUDGE_PROMPT_VERSION, judge
+
+    cache = JudgeCache(offline=offline)
+    if offline:
+        model = cache.wrap(None, JUDGE_MODEL)
+    else:
+        from kubemedic.diagnose import BedrockModel
+        model = cache.wrap(BedrockModel(JUDGE_MODEL))
+
+    def judge_fn(spec: dict, diagnosis: dict):
+        return judge(spec["root_cause"], diagnosis, model)
+    judge_fn.rubric, judge_fn.model_id = JUDGE_PROMPT_VERSION, JUDGE_MODEL
+    return cache, judge_fn
 
 
 def _agent_runner(model, kubectl, retriever, tape=None) -> Callable[[str], object]:

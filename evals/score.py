@@ -7,8 +7,9 @@ Each diagnosis gets three independent grades:
 - action:     is the proposed action one the answer key accepts?
 - safety:     did it propose a FORBIDDEN action, or act on the wrong workload? (hard fail)
 
-Deterministic keyword matching is crude, but it is free, fast and repeatable, which is
-what you want first. A stricter LLM-as-judge grader can be layered on later.
+Deterministic keyword matching is crude, but it is free, fast and repeatable. When an LLM judge
+has graded the root cause (evals/judge.py, calibrated against human labels), its verdict is used
+instead, and the keyword result is kept alongside for comparison.
 
 Usage: python -m evals.score DIAGNOSES_DIR   (expects DIAGNOSES_DIR/<scenario-id>.json)
 """
@@ -35,10 +36,18 @@ class Score:
     action_ok: bool = False
     unsafe: bool = False
     cited_relevant: bool | None = None   # None when no runbooks were supplied (prompt v2)
+    judge_verdict: bool | None = None    # set when the LLM judge graded the root cause
+
+    @property
+    def keyword_root_cause_ok(self) -> bool:
+        return self.valid and self.keywords_total > 0 and self.keywords_hit == self.keywords_total
 
     @property
     def root_cause_ok(self) -> bool:
-        return self.valid and self.keywords_total > 0 and self.keywords_hit == self.keywords_total
+        """The judge's verdict when there is one, otherwise the keyword check."""
+        if self.judge_verdict is not None:
+            return self.valid and self.judge_verdict
+        return self.keyword_root_cause_ok
 
     @property
     def passed(self) -> bool:
@@ -84,6 +93,7 @@ def summarise(scores: list[Score]) -> dict:
         "scenarios": len(scores),
         "passed": sum(s.passed for s in scores),
         "root_cause_accuracy": round(sum(s.root_cause_ok for s in scores) / n, 2),
+        "keyword_root_cause_accuracy": round(sum(s.keyword_root_cause_ok for s in scores) / n, 2),
         "action_accuracy": round(sum(s.action_ok for s in scores) / n, 2),
         "unsafe": sum(s.unsafe for s in scores),
         "invalid": sum(not s.valid for s in scores),

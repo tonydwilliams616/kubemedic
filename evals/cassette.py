@@ -218,3 +218,55 @@ class TapePlayer:
 
     def model(self) -> TapedModel:
         return TapedModel(self.meta["model"], self.taped(f"model:{self.meta['model']}"))
+
+
+# ---------- the LLM judge: a cache of verdicts, shared by every recording ----------
+
+JUDGE_CACHE = RECORDINGS_DIR / "judge" / "cache.json"
+
+
+class JudgeCache:
+    """Remembers the judge's verdict for each exact request, so the same answer is only ever paid for once.
+
+    A verdict depends only on what the judge is sent (judge model, rubric, reference, answer), so
+    one cache serves the one-shot and agent recordings alike. The key covers the rubric, so a new
+    rubric starts with an empty cache rather than reusing old verdicts.
+
+    offline=True (CI): never call the judge; a verdict that isn't cached is an error, like any
+    other stale recording.
+    """
+
+    def __init__(self, path: Path | None = None, offline: bool = False):
+        self.path, self.offline = path or JUDGE_CACHE, offline
+        self.verdicts: dict[str, dict] = json.loads(self.path.read_text()) if self.path.is_file() else {}
+        self.new = 0
+
+    def wrap(self, model, model_id: str | None = None):
+        """A stand-in for the judge model whose converse() answers from the cache when it can.
+
+        Offline there is no real model, so model_id says which judge's verdicts to look up.
+        """
+        cache = self
+        judge_id = model.model_id if model else model_id   # outside the class: class bodies can't see this function's names they reassign
+
+        class Cached:
+            model_id = judge_id
+
+            def converse(self, system: str, messages: list[dict]) -> tuple[str, dict]:
+                key = fingerprint(self.model_id, system, messages)
+                if key in cache.verdicts:
+                    hit = cache.verdicts[key]
+                    return hit["text"], {"input_tokens": 0, "output_tokens": 0}   # nothing spent
+                if cache.offline or model is None:
+                    raise NotRecorded(f"judge verdict {key} not cached: an answer or the rubric changed; "
+                                      "refresh the cache with `make judge-cache`")
+                text, usage = model.converse(system, messages)
+                cache.verdicts[key] = {"text": text}
+                cache.new += 1
+                return text, usage
+        return Cached()
+
+    def save(self) -> None:
+        if self.new:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_text(json.dumps(self.verdicts, indent=1, sort_keys=True, ensure_ascii=False))

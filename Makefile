@@ -13,7 +13,7 @@ AGENT_RECORDING ?= evals/recordings/nova-lite-agent-rag
 AGENT    ?=
 LAB      := $(PYTHON) -m lab --context $(CONTEXT)
 
-.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose investigate eval eval-retrieval record record-agent eval-replay judge-label judge-calibrate tracking-setup mlflow-ui track-reports validate test lint
+.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose investigate eval eval-retrieval record record-agent eval-replay judge-label judge-calibrate judge-cache tracking-setup mlflow-ui track-reports validate test lint
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
@@ -77,10 +77,10 @@ eval-retrieval: ## Score runbook search alone (no LLM) on every broken scenario
 	$(PYTHON) -m evals.retrieval --context $(CONTEXT)
 
 record: ## Run the real RAG eval and save every model answer for CI to replay: make record [MODEL=<id>]
-	$(PYTHON) -m evals.run --context $(CONTEXT) --repeats $(REPEATS) --rag $(if $(MODEL),--model $(MODEL)) --record $(RECORDING)
+	$(PYTHON) -m evals.run --context $(CONTEXT) --repeats $(REPEATS) --rag --judge $(if $(MODEL),--model $(MODEL)) --record $(RECORDING)
 
 record-agent: ## Run the real agent eval (with runbooks) and tape both sides of every investigation for CI
-	$(PYTHON) -m evals.run --context $(CONTEXT) --repeats $(REPEATS) --rag --agent $(if $(MODEL),--model $(MODEL)) --record $(AGENT_RECORDING)
+	$(PYTHON) -m evals.run --context $(CONTEXT) --repeats $(REPEATS) --rag --agent --judge $(if $(MODEL),--model $(MODEL)) --record $(AGENT_RECORDING)
 
 judge-label: ## Label the judge's calibration set yourself, one answer at a time (correct / incorrect)
 	$(PYTHON) -m evals.judge --label
@@ -88,12 +88,16 @@ judge-label: ## Label the judge's calibration set yourself, one answer at a time
 judge-calibrate: ## Check the LLM judge against your labels (and compare with the keyword grader)
 	$(PYTHON) -m evals.judge --calibrate
 
+judge-cache: ## Have the LLM judge grade both recordings once and cache the verdicts CI replays (needs AWS)
+	$(PYTHON) -m evals.run --replay $(RECORDING) --judge
+	$(PYTHON) -m evals.run --replay $(AGENT_RECORDING) --judge
+
 # Champion/challenger: the one-shot diagnoser is the production path, so it must pass the gate.
 # The agent is a challenger: its recording is replayed on every PR (a stale recording still fails)
 # and its scores are reported, but they don't block a merge until it passes the gate itself.
 eval-replay: ## Re-score both recordings through today's code: gate the one-shot champion, report the agent challenger (no AWS, no cluster)
-	$(PYTHON) -m evals.run --replay $(RECORDING) --gate evals/gate.yaml
-	$(PYTHON) -m evals.run --replay $(AGENT_RECORDING)
+	$(PYTHON) -m evals.run --replay $(RECORDING) --judge --judge-offline --gate evals/gate.yaml
+	$(PYTHON) -m evals.run --replay $(AGENT_RECORDING) --judge --judge-offline
 
 tracking-setup: ## Install MLflow (optional) so every eval run is logged to .mlflow/
 	$(PYTHON) -m pip install -r requirements-tracking.txt

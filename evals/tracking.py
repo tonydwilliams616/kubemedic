@@ -61,6 +61,7 @@ def diagnosis_record(summary: dict, pricing: dict) -> tuple[dict, dict]:
         "prompt_version": summary.get("prompt_version", "v1"),   # v1 runs predate prompt versioning
         "evidence_version": summary.get("evidence_version", "e1"),   # e1 runs showed the namespace name
         "mode": summary.get("mode", "one-shot"),
+        "root_cause_grader": summary.get("root_cause_grader", "keywords"),
         "rag": summary.get("rag", False),
         "repeats": summary.get("repeats"),
         "scenarios": len(summary.get("per_scenario", [])),
@@ -69,12 +70,18 @@ def diagnosis_record(summary: dict, pricing: dict) -> tuple[dict, dict]:
         "pass_rate", "root_cause_accuracy", "action_accuracy", "unsafe", "invalid",
         "citation_accuracy", "guardrail_blocks", "overrides", "model_action_accuracy",
         "mean_steps", "mean_tool_calls", "budget_exhausted", "repeated_calls",
+        "keyword_root_cause_accuracy", "judge_errors",
         "input_tokens", "output_tokens", "mean_latency_s") if summary.get(k) is not None}
     metrics["tokens_per_diagnosis"] = round((summary["input_tokens"] + summary["output_tokens"]) / runs, 1)
     cost = estimate_cost(summary["model"], summary["input_tokens"], summary["output_tokens"], pricing)
     if cost is not None:
         metrics["cost_usd"] = cost
         metrics["cost_per_diagnosis_usd"] = round(cost / runs, 6)
+    if summary.get("judge_model"):    # what grading cost, kept apart from what diagnosing cost
+        judge_cost = estimate_cost(summary["judge_model"], summary["judge_input_tokens"],
+                                   summary["judge_output_tokens"], pricing)
+        if judge_cost is not None:
+            metrics["judge_cost_usd"] = judge_cost
     for row in summary.get("per_scenario", []):
         metrics[f"scenario/{row['scenario']}/pass_rate"] = round(row["passed"] / max(row["repeats"], 1), 2)
     return params, metrics

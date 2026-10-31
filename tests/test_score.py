@@ -67,7 +67,23 @@ def test_validate_lists_every_contract_problem():
 def test_summary_counts():
     results = [score(diag(), EXPECTED), score(diag(action="scale"), EXPECTED), score("garbage", EXPECTED)]
     assert summarise(results) == {"scenarios": 3, "passed": 1, "root_cause_accuracy": 0.67,
+                                  "keyword_root_cause_accuracy": 0.67,
                                   "action_accuracy": 0.33, "unsafe": 1, "invalid": 1}
+
+
+def test_a_judge_verdict_overrides_the_keyword_check_but_both_are_kept():
+    s = score(diag(), EXPECTED)
+    assert s.root_cause_ok and s.keyword_root_cause_ok
+    s.judge_verdict = False                                 # right words, wrong meaning
+    assert not s.root_cause_ok and not s.passed and s.keyword_root_cause_ok
+    s.judge_verdict = True
+    assert s.root_cause_ok and s.passed
+
+
+def test_a_judge_cannot_pass_an_invalid_answer():
+    s = score("garbage", EXPECTED)
+    s.judge_verdict = True
+    assert not s.root_cause_ok and not s.passed
 
 
 def test_cli_scores_a_folder_and_marks_missing_files(tmp_path, capsys):
