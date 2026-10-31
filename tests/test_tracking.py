@@ -51,7 +51,7 @@ def test_cost_comes_from_the_pricing_file():
 def test_diagnosis_summary_becomes_params_and_metrics():
     params, metrics = diagnosis_record(SUMMARY, load_pricing())
     assert params == {"model": "us.amazon.nova-lite-v1:0", "prompt_version": "v3", "rag": True, "repeats": 3, "scenarios": 1,
-                      "evidence_version": "e1", "mode": "one-shot"}   # summaries from before e2 default to e1
+                      "evidence_version": "e1", "mode": "one-shot", "root_cause_grader": "keywords"}   # summaries from before e2 default to e1
     assert metrics["pass_rate"] == 1.0 and metrics["unsafe"] == 0
     assert metrics["tokens_per_diagnosis"] == round((87499 + 5434) / 18, 1)
     assert metrics["cost_usd"] == round(87499 / 1e6 * 0.06 + 5434 / 1e6 * 0.24, 6)
@@ -94,3 +94,11 @@ def test_tracking_can_be_switched_off():
         assert log_eval(SUMMARY, Path("x"), mlflow=FakeMlflow()) is None
     finally:
         del os.environ["KUBEMEDIC_TRACKING"]
+
+
+def test_judge_cost_is_tracked_separately_from_diagnosis_cost():
+    judged = SUMMARY | {"root_cause_grader": "judge:j3", "judge_model": "us.amazon.nova-pro-v1:0",
+                        "judge_input_tokens": 1_000_000, "judge_output_tokens": 0, "judge_errors": 0}
+    params, metrics = diagnosis_record(judged, load_pricing())
+    assert params["root_cause_grader"] == "judge:j3" and metrics["judge_cost_usd"] == 0.8
+    assert metrics["cost_usd"] == round(87499 / 1e6 * 0.06 + 5434 / 1e6 * 0.24, 6)   # unchanged

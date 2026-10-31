@@ -159,9 +159,9 @@ impossible rollback every time and needed the guardrail.
 
 **What still keeps a2 below the gate:**
 - *Grader, not agent:* all three `unschedulable-requests` runs found the cause ("CPU request of 64
-  is too high for any node", quoting "Insufficient cpu") but never used the word
-  Pending/Unschedulable, which the keyword check requires. The answer key is not changed to fit
-  model wording; an LLM-as-judge grader is the fix.
+  is too high for any node") but never used the word Pending/Unschedulable, which the keyword
+  check required. The answer key was not changed to fit model wording; the LLM judge (below) now
+  grades these correctly.
 - *Query formulation:* on `crashloop-bad-config-path` the agent searched the runbooks with its own
   words ("config file not found") and found the ConfigMap/Secret page instead of the crash-loop
   page. The one-shot path searches with a symptom summary written by code, which is more reliable.
@@ -174,6 +174,50 @@ enough. An agent should pay off only when the evidence can't be gathered in adva
 promoted until it passes the same gate. The agent's
 recording is replayed in CI on every PR and its scores reported, but it doesn't block merges
 until it passes the gate itself.
+
+### Grading root causes: LLM-as-judge
+
+Keyword grading failed correct answers worded differently ("the CPU request of 64 is too high for
+any node" lacked the word "Unschedulable") and passed wrong ones that contained the right words.
+Root causes are now graded **by meaning** by a judge model (`evals/judge.py`), and the keyword
+result is kept alongside for comparison.
+
+- **A different, stronger model** judges (Nova Pro grading Nova Lite), to avoid self-preference bias.
+- **Pass/fail against a written rubric**, reasoning before verdict. The rubric is the human
+  labeller's own definition of a correct root cause, and contains no scenario details (tested).
+- **The candidate is untrusted** (fenced; the judge never follows instructions inside it), and the
+  judge **never sees the evidence**: with it (rubrics j1, j2), it credited a statement that got a
+  change backwards by reading the right story in the evidence. Telling it not to (j2) changed no
+  verdicts; hiding the evidence (j3) fixed it.
+
+**Who judges the judge?** 28 diagnoses labelled by a human (correct / incorrect / unsure), split
+into a dev set (used to design the rubric) and a test set (labelled afterwards):
+
+| Grader | Test agreement | Cohen's kappa | False passes |
+|---|---|---|---|
+| Keywords | 36% | −0.22 (worse than chance) | 2 |
+| Judge, rubric j3 | 82% | 0.62 (substantial) | **0** |
+
+The remaining disagreements are the judge being stricter than the human, the safe direction. Test
+labels were reviewed once after the first judge run (blind result: 73%, kappa 0.44), and j3 was
+designed after the test results were seen, so a fresh labelled set would confirm it.
+
+**In CI** verdicts come from a cache (`evals/recordings/judge/`, keyed by judge model, rubric,
+answer key and answer), so the gate needs no AWS; an answer the judge hasn't graded fails the
+build, like any stale recording. `make judge-cache` refreshes it.
+
+**Effect on the results:**
+
+| | Pass, judged | Pass, keywords |
+|---|---|---|
+| One-shot v3 | 94% | 100% |
+| Agent a2 | 83% | 83% |
+
+The judge *lowered* the one-shot score: it failed an answer that said the probe changed "from
+/healthz to /" (backwards), which keywords passed. For the agent it passed the three correct
+`unschedulable-requests` answers keywords had failed, and failed two `oom-killed` answers that
+named the CACHE_MB change but never said why it was fatal (the 64Mi limit). One verdict looks too
+strict: it objected to "/healthz:80", which is how our own evidence formats path and port.
 
 ### Runbook search
 
