@@ -1,0 +1,289 @@
+# Diagnoses for checking the LLM judge: each is labelled correct or incorrect BY A HUMAN, never by a model.
+#
+# How to label: read the scenario's answer key (scenarios/<scenario>/expected.yaml, root_cause),
+# then ask "does this root cause name the same underlying cause, in any words?"
+#   correct    same cause (wording, detail and length don't matter)
+#   incorrect  only the symptom, a different cause, a key fact wrong, or something else blamed as the main cause
+#   unsure     you can't decide: the item is left out of the scores rather than forced into a guess
+# Judge the root_cause line; evidence is only there to show what the model meant.
+#
+# Labelling is blind on purpose: this file doesn't show how the keyword grader or the judge
+# marked each item, so neither can influence the human label.
+#
+# Two sets: "dev" items were used to design the rubric (j2 came from reviewing them), so
+# only "test" items, labelled after the rubric was frozen, measure it fairly.
+#
+# Items marked "synthetic" were written by hand to test the judge in both directions; the rest
+# are real model answers from reports/. Don't tune the judge's rubric to these items: if the
+# rubric changes, add new labelled items to check it on.
+items:
+  - id: d01
+    set: dev
+    scenario: oom-killed
+    source: real, prompt v1 (28 Oct)
+    root_cause: "The deployment was updated to use a higher memory limit, causing OOM kills."
+    evidence:
+      - "The pod 'worker-86f5cc66c5-rmlss' is in a CrashLoopBackOff state with the message 'OOMKilled'."
+      - "The rollout history shows a change from 'cache size 16MB' to 'cache size 200MB'."
+      - "The current memory limit is set to '64Mi', which is insufficient for the new cache size."
+    human_label: incorrect
+
+  - id: d02
+    set: dev
+    scenario: missing-secret
+    source: real, prompt v3
+    root_cause: "The secret 'payments-db' does not exist in the namespace."
+    evidence:
+      - "secret \"payments-db\" not found"
+      - "Error from server (BadRequest): container \"payments\" in pod \"payments-66449bf7bd-p52f8\" is waiting to start: CreateContainerConfigError"
+    human_label: correct
+
+  - id: d03
+    set: dev
+    scenario: unschedulable-requests
+    source: real, prompt v1 (28 Oct)
+    root_cause: "Pods are unable to schedule due to insufficient CPU resources and taints on control-plane nodes."
+    evidence:
+      - "Pods are in Pending state with reason 'Unschedulable'."
+      - "Events indicate 'FailedScheduling' due to 'Insufficient cpu' and 'node(s) had untolerated taint {node-role.kubernetes.io/control-plane: }'."
+    human_label: correct
+
+  - id: d04
+    set: dev
+    scenario: bad-image-tag
+    source: real, prompt v2
+    root_cause: "The image 'nginx:1.27.99-alpine' does not exist in the image registry, causing the new pods to fail to start."
+    evidence:
+      - "The pod 'web-6679475cb5-cgmrr' is in 'Pending' state with the message 'Back-off pulling image \"nginx:1.27.99-alpine\"', indicating the image cannot be pulled."
+      - "The log from the pod 'web-6679475cb5-cgmrr' states 'trying and failing to pull image'."
+    human_label: correct
+
+  - id: d05
+    set: dev
+    scenario: crashloop-bad-config-path
+    source: real, prompt v1 (28 Oct)
+    root_cause: "The application is crashing due to a missing configuration file at the specified path."
+    evidence:
+      - "The pod logs indicate a fatal error due to a missing configuration file at /etc/app/settings.yaml."
+      - "The deployment has been continuously restarting, as shown by the 'CrashLoopBackOff' status and numerous 'BackOff' events."
+    human_label: correct
+
+  - id: d06
+    set: dev
+    scenario: failing-readiness-probe
+    source: synthetic (plausible but wrong)
+    root_cause: "The frontend pod is not ready."
+    evidence:
+      - "containers with unready status: [frontend]"
+    human_label: unsure
+
+  - id: d07
+    set: dev
+    scenario: unschedulable-requests
+    source: real, agent a2
+    root_cause: "The CPU request of 64 is too high for any node to accommodate."
+    evidence:
+      - "0/2 nodes are available: 1 Insufficient cpu, 1 node(s) had untolerated taint {node-role.kubernetes.io/control-plane: }."
+      - "Deployment does not have minimum availability."
+    human_label: correct
+
+  - id: d08
+    set: dev
+    scenario: oom-killed
+    source: real, prompt v2
+    root_cause: "The CACHE_MB environment variable was increased from 16MB to 200MB, causing the container to exceed its memory limit of 64Mi and be OOM killed."
+    evidence:
+      - "container worker: env CACHE_MB \"16\" -> \"200\""
+      - "containers with unready status: [worker]"
+    human_label: correct
+
+  - id: d09
+    set: dev
+    scenario: missing-secret
+    source: synthetic (plausible but wrong)
+    root_cause: "The ConfigMap 'payments-config' referenced by the Deployment is missing, so the container cannot be created."
+    evidence:
+      - "CreateContainerConfigError"
+    human_label: incorrect
+
+  - id: d10
+    set: dev
+    scenario: crashloop-bad-config-path
+    source: real, prompt v3
+    root_cause: "The application fails at startup because the CONFIG_PATH environment variable points to a non-existent file."
+    evidence:
+      - "FATAL: config file /etc/app/settings.yaml not found"
+      - "container api: env CONFIG_PATH \"/etc/app/config.yaml\" -> \"/etc/app/settings.yaml\""
+    human_label: correct
+
+  - id: d11
+    set: dev
+    scenario: oom-killed
+    source: real, prompt v1 (28 Oct)
+    root_cause: "The deployment was scaled up with an insufficient memory limit, causing OOM kills."
+    evidence:
+      - "The last terminated container in the pod has the reason OOMKilled and exit code 137."
+      - "The memory limit for the container is set to 64Mi, which is insufficient for the cache size of 200MB."
+    human_label: correct
+
+  - id: d12
+    set: dev
+    scenario: failing-readiness-probe
+    source: real, prompt v3
+    root_cause: "The readiness probe is pointing to the wrong path. The probe is checking for '/healthz' but the logs show that the file does not exist."
+    evidence:
+      - "Readiness probe failed: HTTP probe failed with statuscode: 404"
+      - "open() \"/usr/share/nginx/html/healthz\" failed (2: No such file or directory)"
+    human_label: correct
+
+  - id: d13
+    set: dev
+    scenario: bad-image-tag
+    source: synthetic (plausible but wrong)
+    root_cause: "The container registry is down, so no images can be pulled."
+    evidence:
+      - "Back-off pulling image \"nginx:1.27.99-alpine\""
+    human_label: incorrect
+
+  - id: d14
+    set: dev
+    scenario: unschedulable-requests
+    source: real, prompt v3
+    root_cause: "The CPU request in the Deployment is set to 64, which is likely a mistake and should be 64m (millicores). This causes the pod to be unschedulable because the request is larger than any node can offer."
+    evidence:
+      - "The pod's problem_conditions include 'Insufficient cpu', indicating the request is larger than any node can offer."
+    human_label: correct
+
+  - id: d15
+    set: dev
+    scenario: oom-killed
+    source: synthetic (correct, in different words)
+    root_cause: "Release 2 raised the app's cache to 200 MB, but the container is only allowed 64 Mi of memory, so the kernel kills it every time it starts."
+    evidence:
+      - "last terminated: exit code 137"
+    human_label: correct
+
+  - id: d16
+    set: dev
+    scenario: missing-secret
+    source: real, prompt v1 (28 Oct)
+    root_cause: "Missing Secret causing Pods to fail to start"
+    evidence:
+      - "secret 'payments-db' not found"
+      - "container \"payments\" in pod \"payments-66449bf7bd-p52f8\" is waiting to start: CreateContainerConfigError"
+    human_label: correct
+
+  # ---- test set: added AFTER rubric j2 was written and frozen; label these blind ----
+  - id: t01
+    set: test
+    scenario: crashloop-bad-config-path
+    source: synthetic (plausible but wrong)
+    root_cause: "The ConfigMap api-config was deleted, so the application has no configuration and exits."
+    evidence:
+      - "FATAL: config file /etc/app/settings.yaml not found"
+    human_label: incorrect
+
+  - id: t02
+    set: test
+    scenario: oom-killed
+    source: real, prompt v1 (28 Oct)
+    root_cause: "The deployment was scaled up with an increased memory limit that the node cannot accommodate, leading to OOM (Out Of Memory) kills."
+    evidence:
+      - "The pod 'worker-86f5cc66c5-rmlss' is in a CrashLoopBackOff state with the reason 'OOMKilled'."
+      - "The rollout history shows a change in the CACHE_MB environment variable from 16MB to 200MB, which likely increased the memory usage beyond the node's capacity."
+    human_label: incorrect
+
+  - id: t03
+    set: test
+    scenario: unschedulable-requests
+    source: synthetic (correct, in different words)
+    root_cause: "Someone asked for 64 whole CPU cores instead of 64 millicores, so no node can ever fit the pod."
+    evidence:
+      - "0/2 nodes are available: 1 Insufficient cpu"
+    human_label: correct
+
+  - id: t04
+    set: test
+    scenario: failing-readiness-probe
+    source: real, prompt v1 (28 Oct)
+    root_cause: "The readiness probe is failing because the '/healthz' endpoint does not exist in the nginx container."
+    evidence:
+      - "Readiness probe failed: HTTP probe failed with statuscode: 404"
+      - "open() \"/usr/share/nginx/html/healthz\" failed (2: No such file or directory)"
+    human_label: correct
+
+  - id: t05
+    set: test
+    scenario: missing-secret
+    source: synthetic (plausible but wrong)
+    root_cause: "A dependency of the payments service is missing."
+    evidence:
+      - "CreateContainerConfigError"
+    human_label: correct
+
+  - id: t06
+    set: test
+    scenario: crashloop-bad-config-path
+    source: real, prompt v2
+    root_cause: "The CONFIG_PATH environment variable in the current revision of the 'api' Deployment is set to '/etc/app/settings.yaml', but the ConfigMap 'api-config' only contains 'config.yaml'. This mismatch causes the application to fail to start, as it cannot find the specified config file."
+    evidence:
+      - "CONFIG_PATH \"/etc/app/settings.yaml\""
+      - "FATAL: config file /etc/app/settings.yaml not found"
+    human_label: correct
+
+  - id: t07
+    set: test
+    scenario: failing-readiness-probe
+    source: synthetic (plausible but wrong)
+    root_cause: "The new nginx image is broken and crashes on startup."
+    evidence:
+      - "containers with unready status: [frontend]"
+    human_label: correct
+
+  - id: t08
+    set: test
+    scenario: oom-killed
+    source: real, prompt v2
+    root_cause: "The OOMKilled message indicates that the pod was killed due to exceeding its memory limit. The current revision of the deployment has set the CACHE_MB environment variable to 200, which is likely causing the pod to exceed its memory limit of 64Mi."
+    evidence:
+      - "The pod was killed due to OOMKilled."
+      - "The current revision of the deployment has set the CACHE_MB environment variable to 200."
+    human_label: unsure
+
+  - id: t09
+    set: test
+    scenario: bad-image-tag
+    source: synthetic (correct, in different words)
+    root_cause: "The new release points at an image version that was never published, so the new pods can't pull it."
+    evidence:
+      - "Back-off pulling image \"nginx:1.27.99-alpine\""
+    human_label: correct
+
+  - id: t10
+    set: test
+    scenario: missing-secret
+    source: real, prompt v3
+    root_cause: "The secret 'payments-db' is missing, causing the 'payments' container to fail to start with a 'CreateContainerConfigError'."
+    evidence:
+      - "The pod 'payments-66449bf7bd-p52f8' is in a 'Pending' state with a 'CreateContainerConfigError'."
+      - "The event message states 'secret \"payments-db\" not found'."
+    human_label: correct
+
+  - id: t11
+    set: test
+    scenario: oom-killed
+    source: synthetic (plausible but wrong)
+    root_cause: "The worker needs more CPU, so it is throttled and the kubelet kills it."
+    evidence:
+      - "last terminated: OOMKilled, exit code 137"
+    human_label: incorrect
+
+  - id: t12
+    set: test
+    scenario: bad-image-tag
+    source: real, prompt v3
+    root_cause: "The image tag '1.27.99-alpine' does not exist in the Docker registry."
+    evidence:
+      - "Pod stays in `ErrImagePull`, then `ImagePullBackOff`; the container never starts."
+      - "Error from server (BadRequest): container \"web\" in pod \"web-6679475cb5-cgmrr\" is waiting to start: trying and failing to pull image"
+    human_label: correct
