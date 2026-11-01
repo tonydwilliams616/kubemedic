@@ -102,3 +102,11 @@ def test_judge_cost_is_tracked_separately_from_diagnosis_cost():
     params, metrics = diagnosis_record(judged, load_pricing())
     assert params["root_cause_grader"] == "judge:j3" and metrics["judge_cost_usd"] == 0.8
     assert metrics["cost_usd"] == round(87499 / 1e6 * 0.06 + 5434 / 1e6 * 0.24, 6)   # unchanged
+
+
+def test_self_hosted_runs_are_costed_by_gpu_time():
+    s = {**SUMMARY, "model": "openai:Qwen/Qwen3-8B", "mean_latency_s": 6.0}
+    _, metrics = diagnosis_record(s, load_pricing())
+    runs = s["runs"]
+    assert metrics["cost_usd"] == round(6.0 * runs / 3600 * 0.8048, 6)
+    assert metrics["cost_per_diagnosis_usd"] == round(metrics["cost_usd"] / runs, 6)
