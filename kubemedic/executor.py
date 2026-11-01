@@ -1,4 +1,4 @@
-"""Turns a proposed action into exactly one allowlisted change, run as the executor's own narrow identity (dry runs only until approval and audit exist).
+"""Turns a proposed action into exactly one allowlisted change, run as the executor's own narrow identity, and only with a human approval bound to the cluster state they saw.
 
 Separation of duties:
 - The diagnosing agent (read-only identity) PROPOSES. RBAC stops it changing anything.
@@ -17,15 +17,19 @@ Not supported, on purpose:
 - scale: the diagnosis contract carries no replica count, and guessing one could cause an outage.
 - anything else: not on the allowlist, so refused.
 
-This version only does server-side dry runs ("here is exactly what would change"). Real changes
-arrive together with human approval and an audit log, so there is never a version of this code
-that can change the cluster without both.
+Two ways in, and only two:
+- dry_run(plan): the API server validates the change without applying it (--dry-run=server).
+- apply(plan, approval, audit): the real change. It needs an Approval whose fingerprint matches the
+  cluster state RIGHT NOW (if anything changed since the human approved, it refuses), and it writes
+  the audit record itself, so a change can't happen without being logged.
 
 Usage: python -m kubemedic.executor --namespace km-bad-image-tag --action rollback --target Deployment/web
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import re
 import sys
 from dataclasses import dataclass, field
@@ -64,6 +68,14 @@ class Outcome:
     summary: str                   # what would change (or did), in words
     refused: list[str] = field(default_factory=list)
     output: str = ""               # what kubectl said
+    fingerprint: str = ""          # the cluster state this outcome was based on (see fingerprint())
+
+
+@dataclass(frozen=True)
+class Approval:
+    """A human's yes to ONE plan in ONE cluster state. It can't be reused for anything else."""
+    approver: str
+    fingerprint: str               # must equal fingerprint(plan, live state) at the moment of applying
 
 
 def plan(proposal: dict, namespace: str) -> Plan:
@@ -96,26 +108,60 @@ class Executor:
         rs = self.k.get(p.namespace, "replicasets") or {"items": []}
         return summarise_deployment(dep, rs["items"])
 
-    def check(self, p: Plan) -> tuple[list[str], str]:
-        """Re-check preconditions on the live cluster. Returns (problems, what would change)."""
+    def check(self, p: Plan) -> tuple[list[str], str, str]:
+        """Re-check preconditions on the live cluster. Returns (problems, what would change, state fingerprint)."""
         dep = self.live_deployment(p)
         if dep is None:
-            return [f"Deployment {p.deployment!r} not found in {p.namespace} (or not permitted)"], ""
+            return [f"Deployment {p.deployment!r} not found in {p.namespace} (or not permitted)"], "", ""
         # The same rules the diagnoser's guardrails apply, now against fresh facts.
         proposal = {"proposed_action": {"action": p.action, "target": f"Deployment/{p.deployment}"}}
         problems = guardrails.check(proposal, {"deployments": [dep]})
-        return problems, describe(p, dep)
+        return problems, describe(p, dep), fingerprint(p, dep)
 
     def dry_run(self, p: Plan) -> Outcome:
         """Ask the API server to validate the change without applying it (kubectl --dry-run=server)."""
         if p.action == "escalate":
             return Outcome(p, ok=True, changed=False, summary="escalate: hand over to a human; nothing changes")
-        problems, summary = self.check(p)
+        problems, summary, state = self.check(p)
         if problems:
-            return Outcome(p, ok=False, changed=False, summary=summary, refused=problems)
+            return Outcome(p, ok=False, changed=False, summary=summary, refused=problems, fingerprint=state)
         ok, out = self.k.run(*p.command, "--dry-run=server")
-        return Outcome(p, ok=ok, changed=False, summary=summary, output=out.strip(),
+        return Outcome(p, ok=ok, changed=False, summary=summary, output=out.strip(), fingerprint=state,
                        refused=[] if ok else [f"the API server rejected the dry run: {out.strip()}"])
+
+    def apply(self, p: Plan, approval: Approval, audit) -> Outcome:
+        """Make the real change, only if the approval matches the cluster as it is now. Always audited."""
+        if not isinstance(approval, Approval):
+            raise Refused("a real change needs a human Approval")
+        if p.action == "escalate":
+            raise Refused("escalate changes nothing; there is nothing to apply")
+        problems, summary, state = self.check(p)       # check AGAIN: time passed while the human read it
+        if not problems and state != approval.fingerprint:
+            problems = ["the cluster changed after approval (the approved state no longer matches); "
+                        "nothing was changed: review and approve again"]
+        if problems:
+            audit.append("refused_at_apply", namespace=p.namespace, action=p.action, deployment=p.deployment,
+                         approver=approval.approver, problems=problems)
+            return Outcome(p, ok=False, changed=False, summary=summary, refused=problems, fingerprint=state)
+        ok, out = self.k.run(*p.command)
+        audit.append("executed", namespace=p.namespace, action=p.action, deployment=p.deployment,
+                     command=["kubectl", *p.command], as_user=EXECUTOR_USER, approver=approval.approver,
+                     ok=ok, output=out.strip()[:500])
+        return Outcome(p, ok=ok, changed=ok, summary=summary, output=out.strip(), fingerprint=state,
+                       refused=[] if ok else [f"kubectl failed: {out.strip()}"])
+
+
+def fingerprint(p: Plan, dep: dict) -> str:
+    """A short hash of the plan plus the parts of the live Deployment it depends on.
+
+    The approval is bound to this: if the current revision, its images or the desired replica
+    count change between approval and apply, the fingerprint changes and the apply is refused.
+    """
+    history = dep.get("rollout_history", [])
+    state = {"plan": [p.action, p.namespace, p.deployment, p.command],
+             "revisions": [[r.get("revision"), r.get("current"), r.get("images")] for r in history],
+             "desired": dep.get("replicas", {}).get("desired")}
+    return hashlib.sha256(json.dumps(state, sort_keys=True).encode()).hexdigest()[:16]
 
 
 def describe(p: Plan, dep: dict) -> str:

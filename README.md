@@ -277,6 +277,66 @@ hit@1: the right runbook ranked first. hit@3: it was in the top 3 the model is s
 
 **Caveats:** 18 runs is a small sample (one run ≈ 5.5 points). v2 scored differently on 28 and 30 October (root cause 67% vs 78%, action 100% vs 89%) even at temperature 0, which is why every comparison above uses runs from the same day and cluster. v2 changed the prompt and the evidence together, so their effects aren't separated. Root cause is graded by keyword matching, which is cheap and repeatable but checks which facts are mentioned, not the quality of the reasoning.
 
+## Fixing safely: proposal, approval, audit
+
+The diagnosing agent can only read. A **separate identity**, the executor, can make a change, and
+only through one path: a server-side dry run, a **typed human approval**, a fresh re-check of the
+live cluster, and a **hash-chained audit log** of every step.
+
+```
+make fix SCENARIO=bad-image-tag RAG=1
+
+DIAGNOSIS
+  The image 'nginx:1.27.99-alpine' does not exist in the Docker registry.
+  confidence: high   proposed: rollback Deployment/web
+
+PROPOSED CHANGE (validated by a server-side dry run, not yet applied)
+  command:  kubectl rollout undo deployment/web -n km-bad-image-tag   (run as the executor's own identity)
+  effect:   roll back Deployment web from revision 2 (nginx:1.27.99-alpine) to revision 1
+            (nginx:1.27-alpine), undoing: container web: image "nginx:1.27-alpine" -> "nginx:1.27.99-alpine"
+
+To approve, type the Deployment name (web); anything else rejects: web
+APPLIED: deployment.apps/web rolled back
+```
+
+**Two identities, separate duties** (both bound per `km-*` namespace only; `make rbac-check` proves every line in CI):
+
+| | Agent (diagnoses) | Executor (acts) |
+|---|---|---|
+| Read pods, logs, events, Services | yes | no |
+| Patch Deployments (restart, rollback) | **no** | yes |
+| Delete, create, scale, exec, Secrets | no | no |
+| Anything outside `km-*` namespaces | no | no |
+
+**What the executor never takes from the model:** a command, a flag or a patch. The proposal names
+an action from a fixed menu (`rollout_restart`, `rollback`; `scale` is refused because no replica
+count is given and a guess could cause an outage) and a target that must be a valid Kubernetes name;
+the executor builds the one command itself.
+
+**The approval is bound to the state the human saw.** It carries a fingerprint of the plan and the
+live Deployment (revisions, images, replicas). Just before acting, the executor re-reads the cluster:
+if anyone deployed while the approver was reading, the fingerprint no longer matches and nothing
+changes (a time-of-check to time-of-use gap). The approver types the Deployment's name rather than
+"y", and approval needs a person at a terminal: there is no flag to skip it.
+
+**The audit log** (`audit/audit.jsonl`, `make audit-verify`) records `proposed`, `dry_run`,
+`approved`/`rejected`, `executed`/`refused_at_apply` and `escalated`, each linking to the hash of the
+one before. Changing who approved two fixes in a copy of a real log:
+
+```
+BROKEN: line 3: content does not match its hash (this record was edited)
+BROKEN: line 4: content does not match its hash (this record was edited)
+BROKEN: line 7: content does not match its hash (this record was edited)
+```
+
+It is tamper-evident, not tamper-proof: someone who can write the file could rebuild the whole
+chain. Production systems ship each record somewhere the writer can't modify (for example S3
+Object Lock or a separate logging account).
+
+**Known limitation:** RBAC limits resources and verbs, not fields, so "patch deployments" could in
+principle change an image. Commands are fixed in code for that reason; a ValidatingAdmissionPolicy
+could enforce the same limit inside the cluster.
+
 ## Safety built in from day one
 
 - The lab refuses to run against any non-kind kubectl context unless you pass `--allow-non-kind`.
@@ -284,10 +344,10 @@ hit@1: the right runbook ranked first. hit@3: it was in the top 3 the model is s
 - One third of the scenarios have "escalate, change nothing" as the correct answer, so over-eager fixes are measurable.
 - The agent's ServiceAccount is read-only and bound only in `km-*` namespaces: no Secrets, no `exec`, no writes, nothing in `kube-system` (`make rbac-check` proves it in CI).
 - Logs, env vars and events are redacted before reaching the LLM; ConfigMaps are reduced to key names.
-- Cluster data is fenced in the prompt as untrusted, so instructions planted in logs are ignored. The real guarantee comes in Phase 3: the executor will accept only allowlisted actions, whatever the model says.
+- Cluster data is fenced in the prompt as untrusted, so instructions planted in logs are ignored. The real guarantee is the executor: it accepts only allowlisted actions, whatever the model says.
 - Deterministic guardrails check every proposed action against the evidence (for example, a rollback needs an earlier revision) and fail closed to "escalate".
 - Runbook citations are checked in code: the model may only cite pages it was actually shown.
-- The model only proposes; nothing can change the cluster yet.
+- The model only proposes. A change needs a separate executor identity, a dry run, a typed human approval bound to the live state, and an audit record.
 
 ## Layout
 
@@ -296,7 +356,8 @@ kind/cluster.yaml         local cluster definition
 scenarios/<id>/           base.yaml (optional), break.yaml, expected.yaml (the answer key)
 lab/                      Python CLI: validate, break, check, reset
 deploy/agent/rbac.yaml    the agent's read-only identity
-kubemedic/                the agent: contract, redaction, evidence, diagnosis
+deploy/executor/rbac.yaml the executor's narrow identity (restart and rollback only)
+kubemedic/                the agent (contract, redaction, evidence, diagnosis, tools), executor, approval flow, audit log
 runbooks/                 symptom-first runbooks the agent retrieves and cites
 evals/                    scorers, eval runners, record/replay, merge gate, MLflow tracking, model prices
 evals/recordings/         recorded model answers (one-shot) and conversation tapes (agent) that CI replays on every PR
@@ -312,7 +373,7 @@ tests/                    unit tests (no cluster or AWS needed)
 | 1 | Read-only diagnoser on Amazon Bedrock and an eval harness ✅ |
 | 2 | RAG over symptom-first runbooks: retrieval eval, citations, with vs without comparison ✅ |
 | 3 | Experiment tracking with MLflow; evals as a CI gate (recorded model answers replayed on every PR) ✅ |
-| 4 | Tool-using agent: the model chooses what to inspect next, step by step, instead of one fixed bundle ← *here* |
-| 5 | Allowlisted remediation executor with its own identity, human approval and an audit log |
+| 4 | Tool-using agent: the model chooses what to inspect next, step by step, instead of one fixed bundle ✅ |
+| 5 | Allowlisted remediation executor with its own identity, human approval and an audit log ← *here* (verification next) |
 | 6 | Self-hosted open model on EKS: Karpenter GPU nodes, vLLM serving, scale to zero; accuracy, latency and cost per diagnosis compared with Bedrock |
 | 7 | Production metrics: tokens, cost, latency and success rate in Prometheus/Grafana |

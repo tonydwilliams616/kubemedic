@@ -15,3 +15,6 @@ mlruns/
 
 # Half-finished eval recordings (evals/cassette.py swaps them in only when complete).
 *.partial/
+
+# The audit log is runtime data from your own cluster: it stays on your machine.
+audit/
