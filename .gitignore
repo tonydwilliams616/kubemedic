@@ -18,3 +18,7 @@ mlruns/
 
 # The audit log is runtime data from your own cluster: it stays on your machine.
 audit/
+# Terraform: provider downloads and local state (the bootstrap stack's state is local on purpose)
+.terraform/
+*.tfstate
+*.tfstate.*

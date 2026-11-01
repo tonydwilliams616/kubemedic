@@ -12,8 +12,11 @@ RECORDING ?= evals/recordings/nova-lite-v3-rag
 AGENT_RECORDING ?= evals/recordings/nova-lite-agent-rag
 AGENT    ?=
 LAB      := $(PYTHON) -m lab --context $(CONTEXT)
+TF       ?= terraform
+EKS_CLUSTER := kubemedic-eks
+EKS_REGION  := us-east-1
 
-.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose investigate dry-run fix audit-verify eval-fixrate eval eval-retrieval record record-agent eval-replay judge-label judge-calibrate judge-cache tracking-setup mlflow-ui track-reports validate test lint
+.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose investigate dry-run fix audit-verify eval-fixrate eval eval-retrieval record record-agent eval-replay judge-label judge-calibrate judge-cache tracking-setup mlflow-ui track-reports validate test lint tf-bootstrap eks-up eks-down aws-running tf-check
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
@@ -132,3 +135,37 @@ test: ## Run unit tests
 	$(PYTHON) -m pytest -q
 
 lint: validate test ## Everything CI runs before touching a cluster
+
+# ---- AWS (Phase 6): a short-lived EKS cluster for the self-hosted model. Run `source ./aws-login.sh` first. ----
+
+tf-bootstrap: ## ONCE: create the Terraform state bucket and a $30/month budget alert (needs TF_VAR_alert_email or asks)
+	$(TF) -chdir=terraform/bootstrap init && $(TF) -chdir=terraform/bootstrap apply
+
+eks-up: ## Create the EKS cluster (BILLED: ~$0.13/h until `make eks-down`) and add it to kubeconfig as kubemedic-eks
+	@echo "This creates billable AWS resources (~\$$0.13/h). Remember: make eks-down"
+	$(TF) -chdir=terraform/cluster init && \
+	$(TF) -chdir=terraform/cluster apply && \
+	prev=$$(kubectl config current-context 2>/dev/null || true) && \
+	aws eks update-kubeconfig --name $(EKS_CLUSTER) --region $(EKS_REGION) --alias kubemedic-eks && \
+	{ [ -z "$$prev" ] || kubectl config use-context "$$prev" >/dev/null; } && \
+	kubectl --context kubemedic-eks get nodes
+
+eks-down: ## Destroy the EKS cluster and its VPC (stops the hourly cost); then check with `make aws-running`
+	$(TF) -chdir=terraform/cluster destroy && \
+	(kubectl config delete-context kubemedic-eks >/dev/null 2>&1; true) && \
+	$(MAKE) aws-running
+
+aws-running: ## List anything in the account that bills by the hour: EKS clusters, running instances, NAT gateways, idle volumes, public IPs
+	@echo "EKS clusters:";        aws eks list-clusters --region $(EKS_REGION) --query 'clusters' --output text
+	@echo "Running instances:";   aws ec2 describe-instances --region $(EKS_REGION) --filters Name=instance-state-name,Values=pending,running \
+		--query 'Reservations[].Instances[].[InstanceType,InstanceLifecycle,Placement.AvailabilityZone]' --output text
+	@echo "NAT gateways:";        aws ec2 describe-nat-gateways --region $(EKS_REGION) --filter Name=state,Values=available --query 'NatGateways[].NatGatewayId' --output text
+	@echo "Unattached volumes:";  aws ec2 describe-volumes --region $(EKS_REGION) --filters Name=status,Values=available --query 'Volumes[].[VolumeId,Size]' --output text
+	@echo "Elastic IPs:";         aws ec2 describe-addresses --region $(EKS_REGION) --query 'Addresses[].PublicIp' --output text
+	@echo "(empty lists = nothing billing by the hour)"
+
+tf-check: ## Format-check and validate the Terraform (no AWS calls, no state)
+	$(TF) fmt -check -recursive terraform && \
+	for d in terraform/bootstrap terraform/cluster; do \
+		$(TF) -chdir=$$d init -backend=false -input=false >/dev/null && $(TF) -chdir=$$d validate || exit 1; \
+	done
