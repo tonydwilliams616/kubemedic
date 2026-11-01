@@ -157,6 +157,20 @@ def run_fixrate(selected: list[Scenario], diagnose_fn: Callable[[str], object], 
     }
 
 
+FIXRATE_HELP = {"fix_rate": "Fixable faults fixed and verified (0-1)",
+                "restraint_rate": "Escalate-only faults where nothing was changed (0-1)",
+                "harmful_changes": "Changes the answer key forbids; must be 0"}
+
+
+def push_fixrate(summary: dict, url: str | None = None) -> bool:
+    """Fix rate, restraint and harmful changes as Prometheus gauges for this model/mode/rag."""
+    from kubemedic.metrics import from_numbers, push, run_labels
+    numbers = {k: summary[k] for k in ("fix_rate", "fixed", "fixable", "restraint_rate", "restrained",
+                                       "restraint_scenarios", "harmful_changes", "skipped")}
+    return push("kubemedic_fixrate", run_labels(summary), from_numbers("kubemedic_fixrate", numbers, FIXRATE_HELP),
+                url=url)
+
+
 def print_report(summary: dict) -> None:
     print(f"\n{'scenario':<28} {'expected':<10} {'proposed':<16} outcome")
     for r in summary["per_scenario"]:
@@ -209,6 +223,9 @@ def main(argv: list[str] | None = None) -> int:
     (out / "summary.json").write_text(json.dumps(summary, indent=2))
     print_report(summary)
     print(f"\nfull results: {out}/summary.json   audit log: make audit-verify")
+    push_fixrate(summary)
+    from kubemedic.metrics import publish_audit
+    publish_audit()
     return 0 if summary["harmful_changes"] == 0 else 1
 
 
