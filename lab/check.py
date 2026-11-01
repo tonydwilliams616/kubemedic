@@ -79,8 +79,11 @@ def _pod_failures(pod: dict, events: list[dict], observable: dict) -> list[str]:
 
 
 def evaluate(pods: list[dict], events: list[dict], observable: dict) -> CheckResult:
+    # Terminating pods (deletionTimestamp set) are on their way out and still carry their old crash
+    # history; counting them would report a fault that has already been fixed.
+    pods = [p for p in pods if not p.get("metadata", {}).get("deletionTimestamp")]
     if not pods:
-        return CheckResult(False, None, "no pods match the target selector yet")
+        return CheckResult(False, None, "no live pods match the target selector")
     closest = None
     for pod in pods:
         failures = _pod_failures(pod, events, observable)

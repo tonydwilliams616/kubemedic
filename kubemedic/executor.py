@@ -24,7 +24,9 @@ Two ways in, and only two:
   the audit record itself, so a change can't happen without being logged.
 
 Then verify(plan, audit): "accepted" isn't "fixed". It polls the Deployment until the rollout has
-finished and every replica is updated and available, or a timeout passes, and audits the result.
+finished and every replica is updated and available, and STAYS that way for several checks in a row
+(a pod with no readiness probe can look available for a moment before it crashes), or a timeout
+passes, and audits the result.
 A fix that didn't work is reported and handed back to a human: no automatic second attempt.
 
 Usage: python -m kubemedic.executor --namespace km-bad-image-tag --action rollback --target Deployment/web
@@ -112,11 +114,12 @@ def plan(proposal: dict, namespace: str) -> Plan:
 
 class Executor:
     def __init__(self, context: str = "kind-kubemedic", kubectl: AgentKubectl | None = None,
-                 verify_timeout_s: float = 120, poll_s: float = 3,
+                 verify_timeout_s: float = 120, poll_s: float = 3, stable_checks: int = 3,
                  clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep):
         self.k = kubectl or ExecutorKubectl(context)   # tests pass a fake, so no cluster is needed
         # How verify() waits; tests pass a fake clock and sleep so nothing really waits.
         self.verify_timeout_s, self.poll_s, self.clock, self.sleep = verify_timeout_s, poll_s, clock, sleep
+        self.stable_checks = stable_checks     # healthy this many checks in a row, not just once
 
     def live_deployment(self, p: Plan) -> dict | None:
         """The target as it is NOW, read with the executor's own identity."""
@@ -176,15 +179,17 @@ class Executor:
         done when the controller has seen the new spec, every replica runs it and is available,
         and no old pods are left.
         """
-        started = self.clock()
+        started, in_a_row = self.clock(), 0
         while True:
             healthy, status = rollout_done(self.k.get(p.namespace, "deployment", p.deployment))
+            in_a_row = in_a_row + 1 if healthy else 0       # one unhealthy look resets the count
             waited = round(self.clock() - started, 1)
-            if healthy or waited >= self.verify_timeout_s:
+            if in_a_row >= self.stable_checks or waited >= self.verify_timeout_s:
                 break
             self.sleep(self.poll_s)
+        healthy = in_a_row >= self.stable_checks
         detail = (f"{status.get('available', 0)}/{status.get('desired')} available, {status.get('updated', 0)} updated, "
-                  f"{status.get('replicas', 0)} total")
+                  f"{status.get('replicas', 0)} total" + (f", stable for {self.stable_checks} checks" if healthy else ""))
         audit.append("verified" if healthy else "verification_failed", namespace=p.namespace, action=p.action,
                      deployment=p.deployment, waited_s=waited, status=status)
         return Verification(healthy, waited, status, detail)

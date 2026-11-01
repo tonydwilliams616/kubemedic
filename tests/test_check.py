@@ -65,3 +65,15 @@ def test_event_must_belong_to_the_same_pod():
 def test_failure_detail_explains_closest_pod():
     r = evaluate([pod("a", waiting="ContainerCreating")], [], {"waiting_reason": ["CrashLoopBackOff"]})
     assert not r.ok and "ContainerCreating" in r.detail
+
+
+def test_terminating_pods_are_ignored():
+    # After a fix, the old broken pod is still shutting down and still shows its crash. It must not count.
+    from lab.check import evaluate
+    dying = {"metadata": {"name": "old", "deletionTimestamp": "2026-11-01T17:00:00Z"},
+             "status": {"containerStatuses": [{"state": {}, "lastState": {"terminated": {"reason": "OOMKilled"}}}]}}
+    healthy = {"metadata": {"name": "new"}, "status": {"containerStatuses": [{"state": {"running": {}}}]}}
+    observable = {"terminated_reason": ["OOMKilled"]}
+    assert not evaluate([dying, healthy], [], observable).ok
+    assert evaluate([dict(dying, metadata={"name": "old"}), healthy], [], observable).ok    # same pod, not terminating
+    assert evaluate([dying], [], observable).detail == "no live pods match the target selector"

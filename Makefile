@@ -13,7 +13,7 @@ AGENT_RECORDING ?= evals/recordings/nova-lite-agent-rag
 AGENT    ?=
 LAB      := $(PYTHON) -m lab --context $(CONTEXT)
 
-.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose investigate dry-run fix audit-verify eval eval-retrieval record record-agent eval-replay judge-label judge-calibrate judge-cache tracking-setup mlflow-ui track-reports validate test lint
+.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose investigate dry-run fix audit-verify eval-fixrate eval eval-retrieval record record-agent eval-replay judge-label judge-calibrate judge-cache tracking-setup mlflow-ui track-reports validate test lint
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
@@ -80,6 +80,9 @@ fix: ## Diagnose, propose and, ONLY with your typed approval, apply a fix: make 
 
 audit-verify: ## Check the audit log's hash chain is intact (no record edited, removed or reordered)
 	$(PYTHON) -m kubemedic.audit verify
+
+eval-fixrate: ## End to end on the lab: break, diagnose, approve (kind-only stand-in), apply, verify, reset every scenario [RAG=1] [AGENT=1]
+	$(PYTHON) -m evals.fixrate --context $(CONTEXT) $(if $(MODEL),--model $(MODEL)) $(if $(RAG),--rag) $(if $(AGENT),--agent)
 
 eval: ## Score the diagnoser (or the agent) on every broken scenario: make eval [MODEL=<id>] [REPEATS=3] [RAG=1] [AGENT=1]
 	$(PYTHON) -m evals.run --context $(CONTEXT) --repeats $(REPEATS) $(if $(MODEL),--model $(MODEL)) $(if $(RAG),--rag) $(if $(AGENT),--agent)
