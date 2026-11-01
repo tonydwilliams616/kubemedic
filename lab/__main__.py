@@ -15,17 +15,29 @@ from .kube import KubeError, Kubectl, ensure_safe_context
 
 AGENT_SA = {"kind": "ServiceAccount", "name": "kubemedic-agent", "namespace": "kubemedic-system"}
 AGENT_ROLE = "kubemedic-agent-read"  # ClusterRole defined in deploy/agent/rbac.yaml
+EXECUTOR_SA = {"kind": "ServiceAccount", "name": "kubemedic-executor", "namespace": "kubemedic-system"}
+EXECUTOR_ROLE = "kubemedic-executor-actions"  # ClusterRole defined in deploy/executor/rbac.yaml
 
 
-def agent_read_binding(namespace: str) -> dict:
-    """RoleBinding granting the agent's read-only ClusterRole inside one namespace only."""
+def _binding(namespace: str, role: str, subject: dict) -> dict:
+    """A RoleBinding: grants a ClusterRole's permissions inside ONE namespace only."""
     return {
         "apiVersion": "rbac.authorization.k8s.io/v1",
         "kind": "RoleBinding",
-        "metadata": {"name": "kubemedic-agent-read", "namespace": namespace},
-        "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": AGENT_ROLE},
-        "subjects": [AGENT_SA],
+        "metadata": {"name": role, "namespace": namespace},
+        "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": role},
+        "subjects": [subject],
     }
+
+
+def agent_read_binding(namespace: str) -> dict:
+    """The diagnosing agent may read this namespace."""
+    return _binding(namespace, AGENT_ROLE, AGENT_SA)
+
+
+def executor_binding(namespace: str) -> dict:
+    """The executor may restart or roll back Deployments in this namespace, and nowhere else."""
+    return _binding(namespace, EXECUTOR_ROLE, EXECUTOR_SA)
 
 
 def _targets(args) -> list[scenarios.Scenario]:
@@ -56,12 +68,17 @@ def cmd_break(args) -> int:
     k = Kubectl(args.context)
     for s in _targets(args):
         print(f"==> breaking {s.id} in {s.namespace}")
+        # Always start from a clean namespace, so a break is identical whatever state the namespace
+        # was left in. (Re-applying base.yaml over an already-broken scenario can leave pods stuck in
+        # crash-loop back-off for minutes, so the healthy rollout below would time out.)
+        k.run("delete", "namespace", s.namespace, "--ignore-not-found", "--wait=true")
         k.apply_namespace(s.namespace, {
             "kubemedic.io/managed": "true",
             "kubemedic.io/scenario": s.id,
         })
-        # Let the agent read this namespace (and only namespaces like it).
+        # Let the agent read this namespace, and the executor act in it (and only namespaces like it).
         k.run("apply", "-f", "-", stdin=json.dumps(agent_read_binding(s.namespace)))
+        k.run("apply", "-f", "-", stdin=json.dumps(executor_binding(s.namespace)))
         if s.has_base:
             k.run("apply", "-n", s.namespace, "-f", str(s.base_file))
             k.run("rollout", "status", "-n", s.namespace, f"deployment/{s.deployment}", "--timeout=180s")

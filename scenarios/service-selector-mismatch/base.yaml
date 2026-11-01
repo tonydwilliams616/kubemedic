@@ -58,10 +58,15 @@ spec:
         - name: orders
           image: busybox:1.36
           command: ["sh", "-c"]
-          # Checks its database every 5 seconds and exits if it can't reach it, so a fault that
-          # appears after startup still shows up as a crash.
+          # Gives the database up to 30 seconds to come up at startup (they start together), then
+          # checks it every 5 seconds and exits if it can't reach it, so a fault that appears
+          # later still shows up as a crash.
           args:
             - |
+              for i in $(seq 1 15); do
+                wget -q -T 3 -O /dev/null http://orders-db:5432/ 2>/dev/null && break
+                sleep 2
+              done
               while true; do
                 if ! wget -q -T 3 -O /dev/null http://orders-db:5432/ 2>/tmp/err; then
                   echo "ERROR: cannot reach database orders-db:5432: $(cat /tmp/err)" >&2

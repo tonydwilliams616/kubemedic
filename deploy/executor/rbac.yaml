@@ -1,0 +1,33 @@
+# The executor's identity: a separate ServiceAccount that can make the allowlisted fixes (rollout restart, rollback) and nothing else.
+#
+# Separation of duties: the diagnosing agent (deploy/agent/rbac.yaml) can only read. This
+# identity can change Deployments, but it is only bound (by the lab) in km-* scenario
+# namespaces, and only after a human has approved the change (Phase 5.2).
+#
+# What it can do, and why:
+#   deployments  get, list, patch   rollout restart and rollout undo both patch the Deployment
+#   replicasets  get, list          rollout undo reads them to find the previous revision
+# Deliberately NOT granted: create or delete of anything, deployments/scale, pods, pods/exec,
+# Secrets, ConfigMaps, Services, or any cluster-wide permission.
+#
+# Limitation: RBAC controls resources and verbs, not fields. "patch deployments" could in
+# principle change an image or a command. That is why the executor's code builds every command
+# itself and never takes a command, flag or patch from the model. A ValidatingAdmissionPolicy
+# could enforce the same limit inside the cluster as a further layer.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubemedic-executor
+  namespace: kubemedic-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubemedic-executor-actions
+rules:
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, list, patch]
+  - apiGroups: [apps]
+    resources: [replicasets]
+    verbs: [get, list]
