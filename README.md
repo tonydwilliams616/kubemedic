@@ -281,7 +281,7 @@ hit@1: the right runbook ranked first. hit@3: it was in the top 3 the model is s
 
 The diagnosing agent can only read. A **separate identity**, the executor, can make a change, and
 only through one path: a server-side dry run, a **typed human approval**, a fresh re-check of the
-live cluster, and a **hash-chained audit log** of every step.
+live cluster, **verification that the fix actually worked**, and a **hash-chained audit log** of every step.
 
 ```
 make fix SCENARIO=bad-image-tag RAG=1
@@ -298,6 +298,21 @@ PROPOSED CHANGE (validated by a server-side dry run, not yet applied)
 To approve, type the Deployment name (web); anything else rejects: web
 APPLIED: deployment.apps/web rolled back
 ```
+
+With verification added, a later run on `oom-killed` ended:
+
+```
+To approve, type the Deployment name (worker); anything else rejects: worker
+APPLIED: deployment.apps/worker rolled back. Checking it worked...
+VERIFIED: 1/1 available, 1 updated, 1 total after 3.1s.
+```
+
+**"Accepted" is not "fixed".** After applying, the executor polls the Deployment (with its existing
+`get` permission: it has no watch rights and can't see pods) until the rollout has finished: the
+controller has seen the new spec, every replica runs it, no old pods remain and all are available,
+the same test `kubectl rollout status` applies. If that doesn't happen within two minutes it reports
+`NOT FIXED` with the replica counts it saw, audits `verification_failed`, and changes nothing more:
+a fix that didn't work goes back to a human, with no automatic second attempt.
 
 **Two identities, separate duties** (both bound per `km-*` namespace only; `make rbac-check` proves every line in CI):
 
@@ -320,7 +335,7 @@ changes (a time-of-check to time-of-use gap). The approver types the Deployment'
 "y", and approval needs a person at a terminal: there is no flag to skip it.
 
 **The audit log** (`audit/audit.jsonl`, `make audit-verify`) records `proposed`, `dry_run`,
-`approved`/`rejected`, `executed`/`refused_at_apply` and `escalated`, each linking to the hash of the
+`approved`/`rejected`, `executed`/`refused_at_apply`, `verified`/`verification_failed` and `escalated`, each linking to the hash of the
 one before. Changing who approved two fixes in a copy of a real log:
 
 ```
