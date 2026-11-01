@@ -233,14 +233,16 @@ def diagnose(bundle: dict, model: Model, runbooks: list[dict] | None = None, max
 def main(argv: list[str] | None = None) -> int:
     from .evidence import gather
 
-    p = argparse.ArgumentParser(description="Diagnose one namespace with an LLM on Bedrock")
+    p = argparse.ArgumentParser(description="Diagnose one namespace with an LLM (Bedrock or self-hosted)")
     p.add_argument("--namespace", "-n", required=True)
     p.add_argument("--context", default="kind-kubemedic")
-    p.add_argument("--model", default=DEFAULT_MODEL, help=f"Bedrock model ID (default {DEFAULT_MODEL})")
+    p.add_argument("--model", default=DEFAULT_MODEL, help="a Bedrock model ID, or openai:<name> for a self-hosted model (see kubemedic/models.py)")
     p.add_argument("--rag", action="store_true", help="retrieve the top 3 runbooks and use prompt v3")
     args = p.parse_args(argv)
 
     from botocore.exceptions import BotoCoreError, ClientError
+
+    from .models import ModelServerError, make_model
 
     try:
         bundle = gather(args.namespace, args.context)
@@ -248,12 +250,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.rag:
             from .retrieve import Retriever
             pages = Retriever().top_runbooks(bundle)
-        result = diagnose(bundle, BedrockModel(args.model), runbooks=pages)
+        result = diagnose(bundle, make_model(args.model), runbooks=pages)
     except BotoCoreError as e:   # login/credential problems
         print(f"AWS credentials problem: {e}\nFix: source ./aws-login.sh", file=sys.stderr)
         return 2
     except ClientError as e:     # Bedrock refused the call (access, throttling, bad model ID)
         print(f"Bedrock error ({args.model}): {e.response['Error']['Message']}", file=sys.stderr)
+        return 2
+    except ModelServerError as e:
+        print(f"Model server error ({args.model}): {e}", file=sys.stderr)
         return 2
     print(json.dumps(asdict(result), indent=2))
     return 0 if result.valid else 1

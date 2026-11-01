@@ -173,14 +173,15 @@ def print_report(summary: dict) -> None:
 def main(argv: list[str] | None = None) -> int:
     from botocore.exceptions import BotoCoreError, ClientError
 
-    from kubemedic.diagnose import DEFAULT_MODEL, BedrockModel
+    from kubemedic.diagnose import DEFAULT_MODEL
     from kubemedic.executor import Executor
     from kubemedic.fix import make_diagnose_fn
+    from kubemedic.models import ModelServerError, make_model
     from lab.kube import KubeError
 
     p = argparse.ArgumentParser(description="End-to-end fix rate on the kind lab (changes the lab cluster)")
     p.add_argument("--context", default="kind-kubemedic")
-    p.add_argument("--model", default=DEFAULT_MODEL)
+    p.add_argument("--model", default=DEFAULT_MODEL, help="a Bedrock model ID, or openai:<name> for a self-hosted model (see kubemedic/models.py)")
     p.add_argument("--rag", action="store_true")
     p.add_argument("--agent", action="store_true")
     p.add_argument("--scenario", action="append", help="limit to these scenario ids (repeatable)")
@@ -188,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
     selected = [scenarios.load(i) for i in args.scenario] if args.scenario else scenarios.load_all()
     try:
         approve, lab = lab_approval(args.context), Lab(args.context)
-        diagnose_fn = make_diagnose_fn(args.context, BedrockModel(args.model), args.rag, args.agent)
+        diagnose_fn = make_diagnose_fn(args.context, make_model(args.model), args.rag, args.agent)
         summary = run_fixrate(selected, diagnose_fn, Executor(args.context), AuditLog(), lab, approve)
     except KubeError as e:
         print(f"error: {e}", file=sys.stderr)
@@ -198,6 +199,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     except ClientError as e:
         print(f"Bedrock error ({args.model}): {e.response['Error']['Message']}", file=sys.stderr)
+        return 2
+    except ModelServerError as e:
+        print(f"Model server error ({args.model}): {e}", file=sys.stderr)
         return 2
     summary |= {"model": args.model, "mode": "agent" if args.agent else "one-shot", "rag": args.rag}
     out = REPORTS_DIR / f"{time.strftime('%Y%m%d-%H%M%S')}-fixrate"

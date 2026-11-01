@@ -277,9 +277,9 @@ def main(argv: list[str] | None = None) -> int:
             retrieve_fn = player.retrieve if player.meta["rag"] else None
             repeats, label = player.meta["repeats"], "replay"
         else:
-            from kubemedic.diagnose import BedrockModel
             from kubemedic.evidence import gather
-            model, check_fn, repeats = BedrockModel(args.model), _cluster_check(args.context), args.repeats
+            from kubemedic.models import make_model      # Bedrock, or openai:<name> for a self-hosted model
+            model, check_fn, repeats = make_model(args.model), _cluster_check(args.context), args.repeats
             gather_fn = lambda ns: gather(ns, args.context)  # noqa: E731
             retriever = None
             if args.rag:
