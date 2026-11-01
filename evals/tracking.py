@@ -41,11 +41,19 @@ def git_info() -> dict:
         return {"git_commit": "unknown", "git_dirty": True}
 
 
-def estimate_cost(model_id: str, tokens_in: int, tokens_out: int, pricing: dict) -> float | None:
-    """US dollars for the run, from evals/pricing.yaml. None if the model has no price listed."""
+def estimate_cost(model_id: str, tokens_in: int, tokens_out: int, pricing: dict,
+                  seconds: float | None = None) -> float | None:
+    """US dollars for the run, from evals/pricing.yaml. None if the model has no price listed.
+
+    Bedrock bills per token. A self-hosted model bills per GPU-hour whether busy or idle, so its
+    cost is the time the run kept the GPU busy x the hourly price: what these diagnoses cost if
+    the GPU did nothing else (one request at a time, as the evals run).
+    """
     price = pricing.get(model_id)
     if not price:
         return None
+    if "gpu_hour_usd" in price:
+        return None if seconds is None else round(seconds / 3600 * price["gpu_hour_usd"], 6)
     return round(tokens_in / 1e6 * price["input_per_million"] + tokens_out / 1e6 * price["output_per_million"], 6)
 
 
@@ -73,7 +81,8 @@ def diagnosis_record(summary: dict, pricing: dict) -> tuple[dict, dict]:
         "keyword_root_cause_accuracy", "judge_errors",
         "input_tokens", "output_tokens", "mean_latency_s") if summary.get(k) is not None}
     metrics["tokens_per_diagnosis"] = round((summary["input_tokens"] + summary["output_tokens"]) / runs, 1)
-    cost = estimate_cost(summary["model"], summary["input_tokens"], summary["output_tokens"], pricing)
+    cost = estimate_cost(summary["model"], summary["input_tokens"], summary["output_tokens"], pricing,
+                         seconds=summary.get("mean_latency_s", 0) * runs)
     if cost is not None:
         metrics["cost_usd"] = cost
         metrics["cost_per_diagnosis_usd"] = round(cost / runs, 6)

@@ -16,8 +16,9 @@ TF       ?= terraform
 EKS_CLUSTER := kubemedic-eks
 EKS_REGION  := us-east-1
 EKS_CONTEXT := kubemedic-eks
+SELF_HOSTED := openai:Qwen/Qwen3-8B
 
-.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose investigate dry-run fix audit-verify eval-fixrate eval eval-retrieval record record-agent eval-replay judge-label judge-calibrate judge-cache tracking-setup mlflow-ui track-reports validate test lint tf-bootstrap eks-up eks-down gpu-test aws-running tf-check
+.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose investigate dry-run fix audit-verify eval-fixrate eval eval-retrieval record record-agent eval-replay judge-label judge-calibrate judge-cache tracking-setup mlflow-ui track-reports validate test lint tf-bootstrap eks-up eks-down gpu-test model-up model-forward model-down compare aws-running tf-check
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
@@ -187,6 +188,30 @@ gpu-test: ## Prove scale-from-zero and back: a pod asks for a GPU, Karpenter add
 	done; \
 	echo "== Scaled back to zero GPU nodes, $$(( $$(date +%s) - start ))s after the request:"; \
 	kubectl --context $(EKS_CONTEXT) get nodes -L node-role
+
+model-up: ## Start the self-hosted model (vLLM + Qwen3-8B): Karpenter adds a GPU node (BILLED: spot GPU while it runs). First start ~10 min
+	kubectl --context $(EKS_CONTEXT) apply -f deploy/model/vllm.yaml && \
+	kubectl --context $(EKS_CONTEXT) -n model scale deployment/vllm --replicas=1 && \
+	start=$$(date +%s) && \
+	echo "Waiting for a GPU node, the ~16 GB download and loading onto the GPU (usually 6-12 min)..." && \
+	kubectl --context $(EKS_CONTEXT) -n model rollout status deployment/vllm --timeout=25m && \
+	echo "== Model ready $$(( $$(date +%s) - start ))s after the request, on:" && \
+	kubectl --context $(EKS_CONTEXT) get nodes -l node-role=gpu -L node.kubernetes.io/instance-type,karpenter.sh/capacity-type && \
+	echo "Next, in a second terminal: make model-forward   then: make eval MODEL=$(SELF_HOSTED) RAG=1"
+
+model-forward: ## Make the model reachable at http://localhost:8000/v1 (leave running in its own terminal; Ctrl-C to stop)
+	kubectl --context $(EKS_CONTEXT) -n model port-forward service/vllm 8000:8000
+
+model-down: ## Stop the model: scale to zero, and Karpenter removes the GPU node about a minute later
+	kubectl --context $(EKS_CONTEXT) -n model scale deployment/vllm --replicas=0 && \
+	echo "Waiting for Karpenter to remove the GPU node..." && \
+	for i in $$(seq 1 60); do \
+		[ -z "$$(kubectl --context $(EKS_CONTEXT) get nodeclaims -o name 2>/dev/null)" ] && echo "== GPU node gone" && exit 0; sleep 10; \
+	done; echo "GPU node still there after 10 min: kubectl --context $(EKS_CONTEXT) get nodeclaims"; exit 1
+
+compare: ## Put two eval runs side by side, with cost per diagnosis and break-even: make compare A=reports/<run> B=reports/<run>
+	@test -n "$(A)" -a -n "$(B)" || (echo "A and B are required: make compare A=reports/<bedrock run> B=reports/<self-hosted run>" && exit 1)
+	$(PYTHON) -m evals.compare $(A) $(B)
 
 aws-running: ## List anything in the account that bills by the hour: EKS clusters, running instances, NAT gateways, idle volumes, public IPs
 	@echo "EKS clusters:";        aws eks list-clusters --region $(EKS_REGION) --query 'clusters' --output text

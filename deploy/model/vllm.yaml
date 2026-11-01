@@ -1,0 +1,96 @@
+# Serves the self-hosted model (Qwen3-8B) with vLLM's OpenAI-compatible API on the GPU node; replicas 0 by default, so no GPU runs until `make model-up`.
+#
+# Reaching it: `make model-forward` (kubectl port-forward) -> http://localhost:8000/v1, the default
+# address of kubemedic's OpenAI-compatible adapter. Nothing is exposed outside the cluster.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: model
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  namespace: model
+  labels: {app: vllm}
+spec:
+  replicas: 0                     # make model-up scales to 1 (a GPU node appears); model-down to 0 (it goes)
+  strategy:
+    type: Recreate                # there is only ever one GPU: never run old and new side by side
+  selector:
+    matchLabels: {app: vllm}
+  template:
+    metadata:
+      labels: {app: vllm}
+    spec:
+      automountServiceAccountToken: false     # the model server never talks to the Kubernetes API
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      nodeSelector:
+        node-role: gpu
+      containers:
+        - name: vllm
+          # Pinned: v0.31.0 (2 October 2026). Built on CUDA 13, so the node's NVIDIA driver must be
+          # 580 or newer: `make gpu-test` prints it ("CUDA Version: 13.x" in the nvidia-smi header).
+          image: vllm/vllm-openai:v0.31.0
+          args:
+            - --model=Qwen/Qwen3-8B
+            - --served-model-name=Qwen/Qwen3-8B      # kubemedic calls it openai:Qwen/Qwen3-8B
+            - --dtype=bfloat16                       # full precision for this size: ~16.4 GB of the 22 GB GPU
+            # Room for the longest agent conversation; also bounds the KV cache (~2.4 GB at 16k tokens)
+            - --max-model-len=16384
+            - --gpu-memory-utilization=0.90
+            # Tool calling for the agent: Qwen3 writes Hermes-style tool calls
+            - --enable-auto-tool-choice
+            - --tool-call-parser=hermes
+            - --port=8000
+          env:
+            - name: HF_HOME                          # model download cache, on the node's local NVMe
+              value: /cache/huggingface
+            - name: HF_HUB_DISABLE_TELEMETRY
+              value: "1"
+          ports:
+            - name: http
+              containerPort: 8000
+          resources:
+            requests:
+              cpu: "3"
+              memory: 10Gi
+              ephemeral-storage: 40Gi                # the ~16 GB of weights, with room to spare
+            limits:
+              nvidia.com/gpu: 1                      # this is what makes Karpenter start a GPU node
+          # First start downloads ~16 GB and loads it onto the GPU: allow up to 20 minutes
+          startupProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+            failureThreshold: 120
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - {name: cache, mountPath: /cache}
+            - {name: shm, mountPath: /dev/shm}
+      volumes:
+        - name: cache
+          emptyDir: {}                               # lives (and dies) with the node: nothing to clean up
+        - name: shm                                  # PyTorch uses shared memory; the container default (64 MB) is too small
+          emptyDir:
+            medium: Memory
+            sizeLimit: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm
+  namespace: model
+spec:
+  type: ClusterIP                 # cluster-internal only; reached through kubectl port-forward
+  selector: {app: vllm}
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
