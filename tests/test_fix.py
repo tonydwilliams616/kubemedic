@@ -158,7 +158,23 @@ def test_verification_waits_for_the_rollout_to_finish():
             dep["metadata"]["generation"], dep["status"] = 3, dict(HEALTHY)
     ex.sleep = sleep
     v = ex.verify(plan({"action": "rollback", "target": "Deployment/worker"}, NS), audit)
-    assert v.healthy and len(polls) == 2 and events(audit) == ["verified"] and "1/1 available" in v.detail
+    # healthy from the third look, then it must STAY healthy for 3 looks in a row
+    assert v.healthy and len(polls) == 4 and events(audit) == ["verified"] and "stable for 3 checks" in v.detail
+
+
+def test_healthy_for_a_moment_is_not_verified():
+    k, ex, audit = setup(heals=False)
+    dep = k.objects[("deployment", "worker")]
+    looks, tick = [], ex.sleep
+
+    def flapping(s):                    # like a pod with no readiness probe: available, then it crashes again
+        tick(s)                         # keep the fake clock moving so the timeout is reached
+        looks.append(s)
+        dep["metadata"]["generation"] = 3
+        dep["status"] = dict(HEALTHY) if len(looks) % 2 else {**HEALTHY, "availableReplicas": 0}
+    ex.sleep = flapping
+    v = ex.verify(plan({"action": "rollback", "target": "Deployment/worker"}, NS), audit)
+    assert not v.healthy and events(audit) == ["verification_failed"]
 
 
 def dep_with(generation, **status):

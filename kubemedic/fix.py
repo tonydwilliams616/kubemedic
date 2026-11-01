@@ -28,9 +28,29 @@ from .audit import AuditLog
 from .executor import Approval, Executor, Refused, plan
 
 
+def human_approval(ask: Callable[[str], str] = input, approver: str | None = None):
+    """The approval step for `make fix`: a person types the Deployment's name.
+
+    Returns a function plan -> (who, approved?, what they typed).
+    """
+    def approve(p) -> tuple[str, bool, str]:
+        who = approver or getpass.getuser()
+        try:
+            typed = ask(f"\nTo approve, type the Deployment name ({p.deployment}); anything else rejects: ").strip()
+        except EOFError:
+            typed = ""
+        return who, typed == p.deployment, typed
+    return approve
+
+
 def run_fix(namespace: str, diagnose_fn: Callable[[str], object], executor: Executor, audit: AuditLog,
-            ask: Callable[[str], str] = input, approver: str | None = None, out: Callable[[str], None] = print) -> int:
-    """The whole proposal -> approval -> change workflow. Returns 0 if it ended as intended."""
+            ask: Callable[[str], str] = input, approver: str | None = None, out: Callable[[str], None] = print,
+            approve=None) -> int:
+    """The whole proposal -> approval -> change workflow. Returns 0 if it ended as intended.
+
+    approve decides who says yes. `make fix` always uses the human one (typed name); only the lab
+    fix-rate eval passes its own, kind-only stand-in (evals/fixrate.py).
+    """
     result = diagnose_fn(namespace)
     diag = result.diagnosis or {}
     proposal = diag.get("proposed_action") or {}
@@ -68,12 +88,8 @@ def run_fix(namespace: str, diagnose_fn: Callable[[str], object], executor: Exec
     out("\nPROPOSED CHANGE (validated by a server-side dry run, not yet applied)")
     out(f"  command:  kubectl {' '.join(p.command)}   (run as the executor's own identity)")
     out(textwrap.fill("effect:   " + dry.summary, 96, initial_indent="  ", subsequent_indent="            "))
-    who = approver or getpass.getuser()
-    try:
-        typed = ask(f"\nTo approve, type the Deployment name ({p.deployment}); anything else rejects: ").strip()
-    except EOFError:
-        typed = ""
-    if typed != p.deployment:
+    who, approved, typed = (approve or human_approval(ask, approver))(p)
+    if not approved:
         audit.append("rejected", namespace=namespace, action=p.action, deployment=p.deployment, approver=who,
                      typed=typed[:100])
         out("Rejected. Nothing changed.")
@@ -96,11 +112,30 @@ def run_fix(namespace: str, diagnose_fn: Callable[[str], object], executor: Exec
     return 0
 
 
+def make_diagnose_fn(context: str, model, rag: bool, agent: bool) -> Callable[[str], object]:
+    """namespace -> diagnosis Result, the same way for `make fix` and the fix-rate eval."""
+    from .diagnose import diagnose
+    from .evidence import AgentKubectl, gather
+
+    retriever = None
+    if rag:
+        from .retrieve import Retriever
+        retriever = Retriever()
+
+    def diagnose_fn(namespace: str):
+        if agent:
+            from .agent import investigate
+            from .tools import Toolbox
+            return investigate(Toolbox(namespace, AgentKubectl(context), retriever), model)
+        bundle = gather(namespace, context)
+        return diagnose(bundle, model, runbooks=retriever.top_runbooks(bundle) if retriever else None)
+    return diagnose_fn
+
+
 def main(argv: list[str] | None = None) -> int:
     from botocore.exceptions import BotoCoreError, ClientError
 
-    from .diagnose import DEFAULT_MODEL, BedrockModel, diagnose
-    from .evidence import AgentKubectl, gather
+    from .diagnose import DEFAULT_MODEL, BedrockModel
 
     p = argparse.ArgumentParser(description="Diagnose, propose, and (only with your typed approval) fix a namespace")
     p.add_argument("--namespace", "-n", required=True)
@@ -115,20 +150,7 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return 2
 
-    model = BedrockModel(args.model)
-    retriever = None
-    if args.rag:
-        from .retrieve import Retriever
-        retriever = Retriever()
-
-    def diagnose_fn(namespace: str):
-        if args.agent:
-            from .agent import investigate
-            from .tools import Toolbox
-            return investigate(Toolbox(namespace, AgentKubectl(args.context), retriever), model)
-        bundle = gather(namespace, args.context)
-        return diagnose(bundle, model, runbooks=retriever.top_runbooks(bundle) if retriever else None)
-
+    diagnose_fn = make_diagnose_fn(args.context, BedrockModel(args.model), args.rag, args.agent)
     audit = AuditLog()
     try:
         code = run_fix(args.namespace, diagnose_fn, Executor(args.context), audit)
