@@ -393,6 +393,38 @@ Object Lock or a separate logging account).
 principle change an image. Commands are fixed in code for that reason; a ValidatingAdmissionPolicy
 could enforce the same limit inside the cluster.
 
+## Watching it: metrics and a dashboard
+
+kubemedic is a command that runs and exits, so Prometheus can't scrape it. Each eval, fix-rate
+run and `make fix` instead **pushes** its results to a Pushgateway when it finishes (the standard
+pattern for batch jobs), and Prometheus collects them from there. Grafana shows one dashboard,
+provisioned from files in git (`deploy/monitoring/`), on the kind lab:
+
+```
+make monitoring-up          # Prometheus, Pushgateway, Grafana on kind
+make monitoring-forward     # own terminal: Grafana on :3000, Pushgateway on :9091
+export KUBEMEDIC_PUSHGATEWAY=http://localhost:9091   # then any eval or fix publishes its numbers
+```
+
+![Diagnosis quality, speed and cost per model](docs/images/grafana-quality.png)
+
+![Fixing safely: fix rate, harmful changes, audit chain, approvals by approver](docs/images/grafana-fixing.png)
+
+Real numbers from 1 November (Nova Lite, one-shot, RAG): pass rate 86% (the frontier scenario
+was missed), action accuracy 100% for the system and the model alone, 0 unsafe, 2.23 s and
+$0.00033 per diagnosis; fix rate 4/4, restraint 3/3, 0 harmful changes; audit chain intact.
+
+- **The audit log stays the source of truth.** Audit numbers are recounted from the log on every
+  push, so the dashboard can't drift from what happened; edit the log and the chain tile turns
+  BROKEN. Approvals are split by approver, so the lab eval's stand-in is never mistaken for a person.
+- **Metrics never break the work.** Publishing is off unless `KUBEMEDIC_PUSHGATEWAY` is set, and
+  a failed push only prints a warning.
+- **Least privilege here too.** Prometheus has one static target, so it needs no Kubernetes API
+  access, RBAC or token; every pod runs as non-root with capabilities dropped.
+- **One real fault on the way:** Grafana 13 was OOM-killed at start-up with a 256Mi limit
+  (`OOMKilled`, exit 137, in a restart loop): the same failure the lab's `oom-killed` scenario
+  teaches. Raised to 512Mi.
+
 ## Safety built in from day one
 
 - The lab refuses to run against any non-kind kubectl context unless you pass `--allow-non-kind`.
