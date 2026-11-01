@@ -61,3 +61,15 @@ variable "system_node_instance_types" {
   type        = list(string)
   default     = ["t3.medium", "t3a.medium", "t3.large", "t3a.large"]
 }
+
+variable "karpenter_version" {
+  description = "Karpenter chart version. Kubernetes 1.36 needs Karpenter >= 1.13 (karpenter.sh compatibility matrix)."
+  type        = string
+  default     = "1.14.1"
+}
+
+variable "nvidia_device_plugin_version" {
+  description = "NVIDIA k8s-device-plugin chart version."
+  type        = string
+  default     = "0.19.3"
+}

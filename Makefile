@@ -15,8 +15,9 @@ LAB      := $(PYTHON) -m lab --context $(CONTEXT)
 TF       ?= terraform
 EKS_CLUSTER := kubemedic-eks
 EKS_REGION  := us-east-1
+EKS_CONTEXT := kubemedic-eks
 
-.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose investigate dry-run fix audit-verify eval-fixrate eval eval-retrieval record record-agent eval-replay judge-label judge-calibrate judge-cache tracking-setup mlflow-ui track-reports validate test lint tf-bootstrap eks-up eks-down aws-running tf-check
+.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose investigate dry-run fix audit-verify eval-fixrate eval eval-retrieval record record-agent eval-replay judge-label judge-calibrate judge-cache tracking-setup mlflow-ui track-reports validate test lint tf-bootstrap eks-up eks-down gpu-test aws-running tf-check
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
@@ -128,7 +129,10 @@ track-reports: ## Log report folders made before tracking existed: make track-re
 validate: ## Validate scenario definitions (and manifests, if kubeconform is installed)
 	$(PYTHON) -m lab validate
 	@if command -v kubeconform >/dev/null; then \
-		kubeconform -strict -summary -ignore-filename-pattern 'expected.yaml' scenarios/ deploy/; \
+		kubeconform -strict -summary -ignore-filename-pattern 'expected.yaml' \
+			-schema-location default \
+			-schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+			scenarios/ deploy/; \
 	else echo "kubeconform not installed; skipping manifest schema check"; fi
 
 test: ## Run unit tests
@@ -141,19 +145,48 @@ lint: validate test ## Everything CI runs before touching a cluster
 tf-bootstrap: ## ONCE: create the Terraform state bucket and a $30/month budget alert (needs TF_VAR_alert_email or asks)
 	$(TF) -chdir=terraform/bootstrap init && $(TF) -chdir=terraform/bootstrap apply
 
-eks-up: ## Create the EKS cluster (BILLED: ~$0.13/h until `make eks-down`) and add it to kubeconfig as kubemedic-eks
+eks-up: ## Create the EKS cluster with Karpenter and the GPU node pool (BILLED: ~$0.13/h until `make eks-down`; GPUs only on demand)
 	@echo "This creates billable AWS resources (~\$$0.13/h). Remember: make eks-down"
 	$(TF) -chdir=terraform/cluster init && \
 	$(TF) -chdir=terraform/cluster apply && \
 	prev=$$(kubectl config current-context 2>/dev/null || true) && \
-	aws eks update-kubeconfig --name $(EKS_CLUSTER) --region $(EKS_REGION) --alias kubemedic-eks && \
+	aws eks update-kubeconfig --name $(EKS_CLUSTER) --region $(EKS_REGION) --alias $(EKS_CONTEXT) && \
 	{ [ -z "$$prev" ] || kubectl config use-context "$$prev" >/dev/null; } && \
-	kubectl --context kubemedic-eks get nodes
+	kubectl --context $(EKS_CONTEXT) apply -f deploy/gpu/nodepool.yaml && \
+	kubectl --context $(EKS_CONTEXT) get nodes
 
-eks-down: ## Destroy the EKS cluster and its VPC (stops the hourly cost); then check with `make aws-running`
+eks-down: ## Remove GPU nodes, then destroy the cluster and its VPC (stops the hourly cost); ends with `make aws-running`
+	@# Karpenter's nodes are invisible to Terraform: delete the NodePool first so Karpenter
+	@# terminates them, and wait, or they would outlive the cluster (and keep billing).
+	-kubectl --context $(EKS_CONTEXT) delete nodepool --all --ignore-not-found --timeout=5m
+	@for i in $$(seq 1 60); do \
+		n=$$(kubectl --context $(EKS_CONTEXT) get nodeclaims -o name 2>/dev/null | wc -l | tr -d ' '); \
+		[ "$$n" = "0" ] && exit 0; echo "waiting for $$n Karpenter node(s) to terminate..."; sleep 10; \
+	done; \
+	echo "Karpenter nodes are still running: NOT destroying the cluster (they'd be orphaned). Check: kubectl --context $(EKS_CONTEXT) get nodeclaims"; exit 1
 	$(TF) -chdir=terraform/cluster destroy && \
-	(kubectl config delete-context kubemedic-eks >/dev/null 2>&1; true) && \
-	$(MAKE) aws-running
+	(kubectl config delete-context $(EKS_CONTEXT) >/dev/null 2>&1; true)
+	@$(MAKE) --no-print-directory aws-running
+
+gpu-test: ## Prove scale-from-zero and back: a pod asks for a GPU, Karpenter adds a node, nvidia-smi runs, the node goes (BILLED: ~10 min of spot GPU)
+	@kubectl --context $(EKS_CONTEXT) delete pod gpu-test -n default --ignore-not-found >/dev/null
+	@start=$$(date +%s); \
+	kubectl --context $(EKS_CONTEXT) apply -f deploy/gpu/gpu-test.yaml && \
+	echo "Waiting for Karpenter to start a GPU node and the pod to finish (usually 3-6 min)..." && \
+	if ! kubectl --context $(EKS_CONTEXT) wait pod/gpu-test -n default --for=jsonpath='{.status.phase}'=Succeeded --timeout=15m; then \
+		kubectl --context $(EKS_CONTEXT) describe pod gpu-test -n default | tail -20; \
+		kubectl --context $(EKS_CONTEXT) get nodeclaims; exit 1; \
+	fi; \
+	echo "== GPU pod finished after $$(( $$(date +%s) - start ))s on:"; \
+	kubectl --context $(EKS_CONTEXT) get nodes -l node-role=gpu -L node.kubernetes.io/instance-type,karpenter.sh/capacity-type,topology.kubernetes.io/zone; \
+	kubectl --context $(EKS_CONTEXT) logs gpu-test -n default; \
+	kubectl --context $(EKS_CONTEXT) delete pod gpu-test -n default >/dev/null; \
+	echo "== Pod gone; waiting for Karpenter to remove the idle GPU node..."; \
+	for i in $$(seq 1 60); do \
+		[ -z "$$(kubectl --context $(EKS_CONTEXT) get nodeclaims -o name 2>/dev/null)" ] && break; sleep 10; \
+	done; \
+	echo "== Scaled back to zero GPU nodes, $$(( $$(date +%s) - start ))s after the request:"; \
+	kubectl --context $(EKS_CONTEXT) get nodes -L node-role
 
 aws-running: ## List anything in the account that bills by the hour: EKS clusters, running instances, NAT gateways, idle volumes, public IPs
 	@echo "EKS clusters:";        aws eks list-clusters --region $(EKS_REGION) --query 'clusters' --output text

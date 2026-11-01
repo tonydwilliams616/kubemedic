@@ -19,3 +19,8 @@ output "kubeconfig_command" {
   description = "Adds the cluster to your kubeconfig as context kubemedic-eks."
   value       = "aws eks update-kubeconfig --name ${module.eks.cluster_name} --region ${var.aws_region} --alias kubemedic-eks"
 }
+
+output "karpenter_node_role" {
+  description = "IAM role for nodes Karpenter launches; deploy/gpu/nodepool.yaml uses this name."
+  value       = module.karpenter.node_iam_role_name
+}
