@@ -1,0 +1,42 @@
+# The Pushgateway: kubemedic runs, then exits, so it drops its results here and Prometheus collects them from here.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pushgateway
+  labels: {app: pushgateway}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: pushgateway}
+  template:
+    metadata:
+      labels: {app: pushgateway}
+    spec:
+      automountServiceAccountToken: false      # never talks to the Kubernetes API
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: pushgateway
+          image: prom/pushgateway:v1.11.4
+          ports:
+            - {name: http, containerPort: 9091}
+          readinessProbe:
+            httpGet: {path: /-/ready, port: http}
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pushgateway
+spec:
+  selector: {app: pushgateway}
+  ports:
+    - {name: http, port: 9091, targetPort: http}

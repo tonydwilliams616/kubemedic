@@ -1,0 +1,5 @@
+# The namespace for the monitoring stack, kept apart from the km-* scenario namespaces the agent may read.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
