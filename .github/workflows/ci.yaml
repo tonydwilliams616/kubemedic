@@ -24,6 +24,16 @@ jobs:
             | sudo tar xz -C /usr/local/bin kubeconform
       - run: make lint
 
+  # Terraform is format-checked and validated on every PR. No AWS credentials: nothing is planned or applied here.
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.13.0"   # any 1.13.x (S3 lock files need >= 1.10)
+      - run: make tf-check
+
   # Replays the committed recording of real model answers through this PR's code (prompt,
   # contract, citations, guardrails, scoring) and fails if scores drop below evals/gate.yaml.
   # No AWS credentials, no cluster, no cost. A prompt change makes the recording stale, so the
