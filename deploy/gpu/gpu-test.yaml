@@ -1,0 +1,21 @@
+# A one-off pod that asks for a GPU and runs nvidia-smi: proves Karpenter adds a GPU node on demand, the GPU is usable, and the node goes away afterwards.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gpu-test
+  namespace: default
+spec:
+  restartPolicy: Never
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  containers:
+    - name: cuda
+      image: nvidia/cuda:12.4.1-base-ubuntu22.04
+      command: ["nvidia-smi"]
+      resources:
+        limits:
+          nvidia.com/gpu: 1        # this request is what makes Karpenter start a GPU node
+      securityContext:
+        allowPrivilegeEscalation: false

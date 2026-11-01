@@ -1,7 +1,7 @@
 # The EPHEMERAL EKS cluster that will host the self-hosted model: `make eks-up` before a session, `make eks-down` after.
 
 # Cost while up: control plane $0.10/h plus one small spot system node (~$0.02/h) and its public
-# IP. GPU nodes are added in Phase 6.2b by Karpenter, only while a model is running.
+# IP. GPU nodes are added by Karpenter (karpenter.tf), only while a pod asks for a GPU.
 #
 # This cluster only SERVES A MODEL. The agent and the executor keep working on the kind lab: the
 # lab refuses any context that isn't kind-*, and the agent's and executor's RBAC identities exist

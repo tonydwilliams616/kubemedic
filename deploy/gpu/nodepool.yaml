@@ -1,0 +1,78 @@
+# The GPU node pool: Karpenter starts ONE spot g6.xlarge or g5.xlarge only while a pod asks for a GPU, and removes it a minute after it goes idle.
+#
+# Applied by `make eks-up`; deleted (which terminates any GPU node) by `make eks-down` BEFORE
+# Terraform destroys the cluster, so no instance is ever left running outside Terraform's view.
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: gpu
+spec:
+  role: kubemedic-eks-karpenter-node            # terraform output karpenter_node_role
+  # EKS-optimised Amazon Linux 2023; for NVIDIA instance types Karpenter picks the NVIDIA variant,
+  # which ships the GPU driver and container toolkit
+  amiSelectorTerms:
+    - alias: al2023@latest
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: kubemedic-eks
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: kubemedic-eks
+  associatePublicIPAddress: true                 # public subnets, no NAT (see terraform/cluster/network.tf)
+  # g6.xlarge and g5.xlarge come with a 250 GB local NVMe disk at no extra cost. RAID0 puts
+  # container images and pod scratch space there (fast, and gone with the node), so the paid
+  # EBS root volume can stay small even though vLLM's image and the model weights are ~25 GB.
+  instanceStorePolicy: RAID0
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 40Gi
+        volumeType: gp3
+        encrypted: true
+        deleteOnTermination: true
+  # IMDSv2 only, and pods can't reach the instance's credentials (hop limit 1): pods that need
+  # AWS access get their own role via Pod Identity
+  metadataOptions:
+    httpEndpoint: enabled
+    httpTokens: required
+    httpPutResponseHopLimit: 1
+---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: gpu
+spec:
+  template:
+    metadata:
+      labels:
+        node-role: gpu
+        nvidia.com/gpu.present: "true"           # lets the NVIDIA device plugin run here (and only here)
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: gpu
+      # Only pods that tolerate this taint (i.e. ask for a GPU) land on these expensive nodes
+      taints:
+        - key: nvidia.com/gpu
+          value: "true"
+          effect: NoSchedule
+      requirements:
+        # 1 GPU, ~22 GiB GPU memory each: L4 (cheaper on-demand) or A10G (faster). Offering both
+        # makes spot capacity easier to find.
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values: ["g6.xlarge", "g5.xlarge"]
+        # Spot first (about half price); on-demand only if no spot capacity is available
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot", "on-demand"]
+      # A safety net: no GPU node lives longer than 6 hours, whatever happens
+      expireAfter: 6h
+  # Hard cap: never more than one GPU in the cluster, so a mistake can't start a fleet
+  limits:
+    nvidia.com/gpu: 1
+  # Scale to zero: an empty GPU node is removed after a minute
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 1m
