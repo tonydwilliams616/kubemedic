@@ -1,14 +1,14 @@
 [
  {
   "id": "readiness-probe-failing",
-  "score": 0.655
+  "score": 0.65
  },
  {
   "id": "liveness-probe-restarts",
-  "score": 0.449
+  "score": 0.442
  },
  {
   "id": "crashloopbackoff",
-  "score": 0.385
+  "score": 0.381
  }
 ]

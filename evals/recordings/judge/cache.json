@@ -2,6 +2,12 @@
  "001547b76940c3ed": {
   "text": "{\"reason\": \"The candidate correctly identifies the change in the CACHE_MB environment variable as the root cause, which aligns with the reference. However, the candidate's statement lacks the critical detail that the container's memory limit is insufficient (64Mi) to accommodate the increased memory usage (200MB), leading to OOM-killing by the kernel.\", \"verdict\": \"incorrect\"}"
  },
+ "0135737d7c9c2267": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies the absence of the 'payments-db' secret in the namespace as the reason for the container's failure to start, aligning with the reference.\", \"verdict\": \"correct\"}"
+ },
+ "02d1b79a98813499": {
+  "text": "{\"reason\": \"The candidate's root cause is incorrect because it suggests a network policy or DNS issue without evidence, whereas the reference specifies a label mismatch as the cause.\", \"verdict\": \"incorrect\"}"
+ },
  "0724a39d2fdfa0d4": {
   "text": "{\"reason\": \"The candidate's root cause correctly identifies the mismatch between the expected configuration file path set by the latest deployment and the actual content of the ConfigMap, which is the same underlying cause as described in the reference.\", \"verdict\": \"correct\"}"
  },
@@ -14,14 +20,26 @@
  "15e27b16834d67b9": {
   "text": "{\"reason\": \"The candidate's root cause correctly identifies that the CONFIG_PATH environment variable points to a non-existent file, which aligns with the reference's explanation of the missing file due to a mismatch between the Deployment and ConfigMap settings.\", \"verdict\": \"correct\"}"
  },
+ "1d4e23b909dde11b": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies that the readiness probe is pointing to a non-existent endpoint in the nginx container, which aligns with the reference's explanation of the issue.\", \"verdict\": \"correct\"}"
+ },
+ "24908e3e88eaf0a6": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies the absence of the 'payments-db' secret in the namespace as the underlying issue, which aligns with the reference. It also correctly notes the symptom of the failure (CreateContainerConfigError) without focusing solely on it, thus meeting the standard for a correct root cause.\", \"verdict\": \"correct\"}"
+ },
  "292e28822e332b52": {
   "text": "{\"reason\": \"The candidate's root cause correctly identifies that the CONFIG_PATH environment variable was changed to point to a non-existent file, which aligns with the reference's explanation of the issue.\", \"verdict\": \"correct\"}"
+ },
+ "2c1b9d31880061d6": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies that the CONFIG_PATH environment variable points to a non-existent file, which aligns with the reference's explanation of the missing file causing the app to exit and the pod to crash-loop.\", \"verdict\": \"correct\"}"
  },
  "3076f1d0e869f9b2": {
   "text": "{\"reason\": \"The candidate's root cause correctly identifies the mismatch between the expected config file path set by the latest deployment and the actual content of the ConfigMap, which is the same underlying cause as in the reference.\", \"verdict\": \"correct\"}"
  },
  "356479278c3457eb": {
   "text": "{\"reason\": \"The candidate's root cause correctly identifies the absence of the 'payments-db' secret in the namespace, which aligns with the reference's explanation of the issue.\", \"verdict\": \"correct\"}"
+ },
+ "3ba430edf9aa33ce": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies the missing configuration file and the change in the CONFIG_PATH environment variable as the underlying cause, aligning with the reference.\", \"verdict\": \"correct\"}"
  },
  "3ed394fcd2cd8088": {
   "text": "{\"reason\": \"The candidate's root cause correctly identifies that the CONFIG_PATH environment variable was changed to point to a non-existent file, which aligns with the reference's explanation of the issue.\", \"verdict\": \"correct\"}"
@@ -32,26 +50,83 @@
  "4a4a8f503e0281ee": {
   "text": "{\"reason\": \"The candidate's root cause correctly identifies that the CPU request is too high for any node to accommodate, which aligns with the reference stating that no node has enough allocatable CPU due to the deployment requesting 64 CPU cores.\", \"verdict\": \"correct\"}"
  },
+ "4b0ceeff320ec227": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies that the container exceeded its memory limit, which aligns with the reference's explanation of the OOM-kill due to insufficient memory allocation.\", \"verdict\": \"correct\"}"
+ },
+ "5a5980822397d0fe": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies the change in the readiness probe path to '/healthz' and the app's inability to serve content at this path, which aligns with the reference's explanation of the issue.\", \"verdict\": \"correct\"}"
+ },
+ "605bfe461c7cf48a": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies the non-existence of the image 'nginx:1.27.99-alpine' in the registry as the underlying issue, which aligns with the reference. It also accurately describes the consequence of this issue, which is the pod's failure to pull the image and entering the ImagePullBackOff state.\", \"verdict\": \"correct\"}"
+ },
+ "6706747a45432cda": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies the change in the readiness probe path to '/healthz' and the absence of this endpoint as the reason for the probe failure, aligning with the reference.\", \"verdict\": \"correct\"}"
+ },
+ "6c3e6a2fecb2924f": {
+  "text": "{\"reason\": \"The candidate correctly identifies the root cause as the incorrect unit in the CPU request, leading to an unrealistic demand for resources that no node can satisfy.\", \"verdict\": \"correct\"}"
+ },
  "754a36da863d2869": {
   "text": "{\"reason\": \"The candidate correctly identifies that the readiness probe is pointing to the wrong path, which aligns with the reference. Although the candidate specifies '/healthz:80' instead of '/healthz', this minor inaccuracy does not change the root cause or the corrective action, which would be to update the readiness probe to a path that the application does serve.\", \"verdict\": \"correct\"}"
+ },
+ "79a20784cd05f87c": {
+  "text": "{\"reason\": \"The candidate's root cause is incorrect because it suggests a network policy or DNS issue without evidence, whereas the reference specifies a label mismatch as the cause.\", \"verdict\": \"incorrect\"}"
+ },
+ "7d38cce7f114e557": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies that the increase in cache size beyond the memory limit is the cause of the container being killed, aligning with the reference.\", \"verdict\": \"correct\"}"
  },
  "8140fac92951430f": {
   "text": "{\"reason\": \"The candidate's root cause incorrectly states that the readiness probe was changed to '/' and mentions a non-existent file, which is not aligned with the reference that correctly identifies the probe change to GET /healthz and the issue with nginx not serving it.\", \"verdict\": \"incorrect\"}"
  },
+ "83ab4e262b77c075": {
+  "text": "{\"reason\": \"The candidate's root cause is too vague and only describes the symptom, not the underlying condition that caused the issue.\", \"verdict\": \"incorrect\"}"
+ },
  "8dc7cf93fe0f042b": {
   "text": "{\"reason\": \"The candidate's root cause correctly identifies the absence of the secret 'payments-db' in the namespace, which aligns with the reference's explanation of the issue.\", \"verdict\": \"correct\"}"
+ },
+ "944a8dc57fe91cfe": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies the issue with the readiness probe pointing to an incorrect path, leading to a 404 error, which aligns with the reference's explanation of the problem.\", \"verdict\": \"correct\"}"
  },
  "a238d81648064a00": {
   "text": "{\"reason\": \"The candidate's root cause correctly identifies that the CPU request is set to an unrealistic value, which aligns with the reference's explanation that the deployment requests 64 CPU cores, likely meant 64m, and no node has that much allocatable CPU. This directly explains why the pod stays Pending.\", \"verdict\": \"correct\"}"
  },
+ "a73d08b5b925d4df": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies that the 'payments' Deployment is referencing a non-existent secret, which aligns with the reference answer.\", \"verdict\": \"correct\"}"
+ },
  "aab4141334d6cb72": {
   "text": "{\"reason\": \"The candidate's root cause correctly identifies the non-existence of the image 'nginx:1.27.99-alpine' in the registry, which aligns with the reference's explanation of the issue.\", \"verdict\": \"correct\"}"
+ },
+ "afa6114398c4e633": {
+  "text": "{\"reason\": \"The candidate correctly identifies that the deployment's CPU request is set to a value (64) that exceeds the capacity of any node, which aligns with the reference's explanation of the issue.\", \"verdict\": \"correct\"}"
  },
  "baa3e02826c07fed": {
   "text": "{\"reason\": \"The candidate correctly identifies that the readiness probe points to an incorrect path, '/healthz', which is not served by the application, leading to a 404 error. This matches the reference's explanation of the root cause.\", \"verdict\": \"correct\"}"
  },
+ "bb91e73362630a27": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies the non-existent image tag as the underlying issue, matching the reference's explanation.\", \"verdict\": \"correct\"}"
+ },
+ "bff6e2a0a6148bb5": {
+  "text": "{\"reason\": \"The candidate's root cause incorrectly describes the path issue. The reference states that the readiness probe was changed to GET /healthz, which nginx does not serve, leading to a 404 error. The candidate incorrectly states that the probe is configured to check '/healthz:80' and tries to access '/usr/share/nginx/html/healthz', which is not mentioned in the reference.\", \"verdict\": \"incorrect\"}"
+ },
+ "c2e9d6c1f3c1d21b": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies the increase in cache size to 200MB as the cause, which exceeds the 64Mi memory limit, leading to OOM-killing, aligning with the reference.\", \"verdict\": \"correct\"}"
+ },
+ "c707a3ab8c272b6e": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies the mismatch between the expected configuration file path and the actual content of the ConfigMap, which is the same underlying cause as in the reference.\", \"verdict\": \"correct\"}"
+ },
+ "c9de5318f99668cc": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies the mismatch between the CONFIG_PATH set in the Deployment and the actual key in the ConfigMap, which is the same underlying cause as in the reference.\", \"verdict\": \"correct\"}"
+ },
+ "cec728537a3fc02f": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies that the CPU request is larger than any node can offer, which aligns with the reference stating that no node has that much allocatable CPU.\", \"verdict\": \"correct\"}"
+ },
+ "cff4b50bb2ce6851": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies that the issue is due to the CPU request being too large for any node, which aligns with the reference stating that no node has enough allocatable CPU due to the deployment requesting 64 CPU cores.\", \"verdict\": \"correct\"}"
+ },
  "d097701f4569c907": {
   "text": "{\"reason\": \"The candidate's root cause correctly identifies the unrealistically high CPU request as the underlying issue, aligning with the reference that specifies the deployment requests 64 CPU cores which no node can fulfill.\", \"verdict\": \"correct\"}"
+ },
+ "d44f0b4714dacd72": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies the increase in cache size to 200MB as the underlying issue, which exceeds the 64Mi memory limit and causes the container to be killed, aligning with the reference.\", \"verdict\": \"correct\"}"
  },
  "d89a022f1fd9a59a": {
   "text": "{\"reason\": \"The candidate's root cause correctly identifies the increase in cache size to 200MB as the underlying issue, which exceeds the memory limit of 64Mi, leading to the container being killed. This matches the reference in both cause and effect.\", \"verdict\": \"correct\"}"
@@ -62,13 +137,22 @@
  "df95c0f3adeaf441": {
   "text": "{\"reason\": \"The candidate's root cause correctly identifies the increase in cache size to 200MB as the cause, which exceeds the 64Mi memory limit, leading to the container being killed for exceeding its memory limit. This matches the reference in both cause and effect.\", \"verdict\": \"correct\"}"
  },
+ "ef31ee984eb50617": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies that the readiness probe is pointing to an incorrect path that the application does not serve, aligning with the reference's explanation of the issue.\", \"verdict\": \"correct\"}"
+ },
  "f344e44ded706682": {
   "text": "{\"reason\": \"The candidate correctly identifies that the readiness probe is pointing to an incorrect path and specifies that the endpoint does not exist in the nginx container, which aligns with the reference's explanation of the issue.\", \"verdict\": \"correct\"}"
+ },
+ "f58330080f3b7c42": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies the change in the CONFIG_PATH environment variable and the absence of the referenced config file, which aligns with the reference answer.\", \"verdict\": \"correct\"}"
  },
  "f5fcaf53be4220f7": {
   "text": "{\"reason\": \"The candidate's root cause correctly identifies the missing configuration file and the change in the CONFIG_PATH environment variable as the underlying issue, matching the reference.\", \"verdict\": \"correct\"}"
  },
  "f76eb57c6e634309": {
   "text": "{\"reason\": \"The candidate's root cause correctly identifies that the increase in memory usage due to the current revision is the underlying cause of the container being killed by the kernel, aligning with the reference's explanation of the OOM-kill due to mismatched memory settings.\", \"verdict\": \"correct\"}"
+ },
+ "f8f49eb610e581b0": {
+  "text": "{\"reason\": \"The candidate's root cause correctly identifies the absence of the 'payments-db' secret as the reason for the pod's failure to start, aligning with the reference.\", \"verdict\": \"correct\"}"
  }
 }

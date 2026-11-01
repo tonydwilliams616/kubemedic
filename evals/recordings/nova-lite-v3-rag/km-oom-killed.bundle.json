@@ -4,24 +4,24 @@
   {
    "name": "worker",
    "replicas": {
-    "replicas": 2,
-    "readyReplicas": 1,
+    "replicas": 1,
+    "readyReplicas": 0,
     "updatedReplicas": 1,
-    "availableReplicas": 1,
+    "availableReplicas": 0,
     "desired": 1
    },
    "conditions": [
     {
-     "type": "Available",
-     "status": "True",
-     "reason": "MinimumReplicasAvailable",
-     "message": "Deployment has minimum availability."
-    },
-    {
      "type": "Progressing",
      "status": "True",
      "reason": "NewReplicaSetAvailable",
-     "message": "ReplicaSet \"worker-c75db4fdd\" has successfully progressed."
+     "message": "ReplicaSet \"worker-5dc69c79ff\" has successfully progressed."
+    },
+    {
+     "type": "Available",
+     "status": "False",
+     "reason": "MinimumReplicasUnavailable",
+     "message": "Deployment does not have minimum availability."
     }
    ],
    "containers": [
@@ -70,7 +70,7 @@
      ]
     },
     {
-     "revision": 19,
+     "revision": 25,
      "current": false,
      "change_cause": "cache size 16MB",
      "images": [
@@ -81,7 +81,7 @@
      ]
     },
     {
-     "revision": 20,
+     "revision": 26,
      "current": true,
      "change_cause": "cache size 200MB",
      "images": [
@@ -96,7 +96,7 @@
  ],
  "pods": [
   {
-   "name": "worker-5dc69c79ff-8f52m",
+   "name": "worker-5dc69c79ff-sbn6b",
    "owner": "worker-5dc69c79ff",
    "phase": "Running",
    "ready": "0/1",
@@ -105,10 +105,10 @@
      "name": "worker",
      "image": "docker.io/library/python:3.12-alpine",
      "ready": false,
-     "restarts": 2,
+     "restarts": 5,
      "state": {
       "waiting": "CrashLoopBackOff",
-      "message": "back-off 20s restarting failed container=worker pod=worker-5dc69c79ff-8f52m_<namespace>(b805a964-5b50-4da6-b0d5-7ae4e827fba6)"
+      "message": "back-off 2m40s restarting failed container=worker pod=worker-5dc69c79ff-sbn6b_<namespace>(184884a3-2fbd-4ca9-8558-2349e25767ab)"
      },
      "last_terminated": {
       "reason": "OOMKilled",
@@ -128,102 +128,147 @@
      "message": "containers with unready status: [worker]"
     }
    ]
-  },
-  {
-   "name": "worker-c75db4fdd-dbxpz",
-   "owner": "worker-c75db4fdd",
-   "phase": "Running",
-   "ready": "1/1",
-   "containers": [
-    {
-     "name": "worker",
-     "image": "docker.io/library/python:3.12-alpine",
-     "ready": true,
-     "restarts": 0,
-     "state": {
-      "running": true
-     }
-    }
-   ],
-   "problem_conditions": []
   }
  ],
  "events": [
   {
    "type": "Warning",
    "reason": "BackOff",
-   "object": "Pod/worker-5dc69c79ff-jtjhk",
-   "count": 371,
-   "message": "Back-off restarting failed container worker in pod worker-5dc69c79ff-jtjhk_<namespace>(96750c0f-40f2-4f9b-b1bd-3973649bca2d)"
+   "object": "Pod/worker-5dc69c79ff-msj8q",
+   "count": 1821,
+   "message": "Back-off restarting failed container worker in pod worker-5dc69c79ff-msj8q_<namespace>(0a652295-7d2d-43b9-9622-ae8b8a33c37a)"
+  },
+  {
+   "type": "Normal",
+   "reason": "SuccessfulCreate",
+   "object": "ReplicaSet/worker-c75db4fdd",
+   "count": 1,
+   "message": "Created pod: worker-c75db4fdd-bp9cf"
+  },
+  {
+   "type": "Normal",
+   "reason": "ScalingReplicaSet",
+   "object": "Deployment/worker",
+   "count": 5,
+   "message": "Scaled up replica set worker-c75db4fdd to 1 from 0"
+  },
+  {
+   "type": "Normal",
+   "reason": "Scheduled",
+   "object": "Pod/worker-c75db4fdd-bp9cf",
+   "count": 1,
+   "message": "Successfully assigned <namespace>/worker-c75db4fdd-bp9cf to kubemedic-worker"
+  },
+  {
+   "type": "Normal",
+   "reason": "Pulled",
+   "object": "Pod/worker-c75db4fdd-bp9cf",
+   "count": 1,
+   "message": "Container image \"python:3.12-alpine\" already present on machine"
+  },
+  {
+   "type": "Normal",
+   "reason": "Created",
+   "object": "Pod/worker-c75db4fdd-bp9cf",
+   "count": 1,
+   "message": "Created container worker"
+  },
+  {
+   "type": "Normal",
+   "reason": "Started",
+   "object": "Pod/worker-c75db4fdd-bp9cf",
+   "count": 1,
+   "message": "Started container worker"
+  },
+  {
+   "type": "Normal",
+   "reason": "Scheduled",
+   "object": "Pod/worker-5dc69c79ff-sbn6b",
+   "count": 1,
+   "message": "Successfully assigned <namespace>/worker-5dc69c79ff-sbn6b to kubemedic-worker"
   },
   {
    "type": "Normal",
    "reason": "SuccessfulDelete",
    "object": "ReplicaSet/worker-5dc69c79ff",
    "count": 1,
-   "message": "Deleted pod: worker-5dc69c79ff-jtjhk"
-  },
-  {
-   "type": "Normal",
-   "reason": "ScalingReplicaSet",
-   "object": "Deployment/worker",
-   "count": 4,
-   "message": "Scaled down replica set worker-5dc69c79ff to 0 from 1"
-  },
-  {
-   "type": "Normal",
-   "reason": "Scheduled",
-   "object": "Pod/worker-5dc69c79ff-8f52m",
-   "count": 1,
-   "message": "Successfully assigned <namespace>/worker-5dc69c79ff-8f52m to kubemedic-worker"
+   "message": "Deleted pod: worker-5dc69c79ff-msj8q"
   },
   {
    "type": "Normal",
    "reason": "SuccessfulCreate",
    "object": "ReplicaSet/worker-5dc69c79ff",
    "count": 1,
-   "message": "Created pod: worker-5dc69c79ff-8f52m"
+   "message": "Created pod: worker-5dc69c79ff-sbn6b"
   },
   {
    "type": "Normal",
    "reason": "ScalingReplicaSet",
    "object": "Deployment/worker",
-   "count": 4,
+   "count": 7,
+   "message": "Scaled down replica set worker-5dc69c79ff to 0 from 1"
+  },
+  {
+   "type": "Normal",
+   "reason": "ScalingReplicaSet",
+   "object": "Deployment/worker",
+   "count": 7,
    "message": "Scaled up replica set worker-5dc69c79ff to 1 from 0"
   },
   {
    "type": "Normal",
+   "reason": "Killing",
+   "object": "Pod/worker-c75db4fdd-bp9cf",
+   "count": 1,
+   "message": "Stopping container worker"
+  },
+  {
+   "type": "Normal",
+   "reason": "SuccessfulDelete",
+   "object": "ReplicaSet/worker-c75db4fdd",
+   "count": 1,
+   "message": "Deleted pod: worker-c75db4fdd-bp9cf"
+  },
+  {
+   "type": "Normal",
+   "reason": "ScalingReplicaSet",
+   "object": "Deployment/worker",
+   "count": 6,
+   "message": "Scaled down replica set worker-c75db4fdd to 0 from 1"
+  },
+  {
+   "type": "Normal",
    "reason": "Pulled",
-   "object": "Pod/worker-5dc69c79ff-8f52m",
-   "count": 3,
+   "object": "Pod/worker-5dc69c79ff-sbn6b",
+   "count": 5,
    "message": "Container image \"python:3.12-alpine\" already present on machine"
   },
   {
    "type": "Normal",
    "reason": "Created",
-   "object": "Pod/worker-5dc69c79ff-8f52m",
-   "count": 3,
+   "object": "Pod/worker-5dc69c79ff-sbn6b",
+   "count": 5,
    "message": "Created container worker"
   },
   {
    "type": "Normal",
    "reason": "Started",
-   "object": "Pod/worker-5dc69c79ff-8f52m",
-   "count": 3,
+   "object": "Pod/worker-5dc69c79ff-sbn6b",
+   "count": 5,
    "message": "Started container worker"
   },
   {
    "type": "Warning",
    "reason": "BackOff",
-   "object": "Pod/worker-5dc69c79ff-8f52m",
-   "count": 3,
-   "message": "Back-off restarting failed container worker in pod worker-5dc69c79ff-8f52m_<namespace>(b805a964-5b50-4da6-b0d5-7ae4e827fba6)"
+   "object": "Pod/worker-5dc69c79ff-sbn6b",
+   "count": 10,
+   "message": "Back-off restarting failed container worker in pod worker-5dc69c79ff-sbn6b_<namespace>(184884a3-2fbd-4ca9-8558-2349e25767ab)"
   }
  ],
  "configmaps": [],
  "logs": [
   {
-   "pod": "worker-5dc69c79ff-8f52m",
+   "pod": "worker-5dc69c79ff-sbn6b",
    "container": "worker",
    "previous": false,
    "ok": true,
@@ -231,7 +276,7 @@
    "text": ""
   },
   {
-   "pod": "worker-5dc69c79ff-8f52m",
+   "pod": "worker-5dc69c79ff-sbn6b",
    "container": "worker",
    "previous": true,
    "ok": true,

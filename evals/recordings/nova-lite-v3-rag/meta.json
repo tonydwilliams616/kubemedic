@@ -3,13 +3,14 @@
   "prompt_version": "v3",
   "rag": true,
   "repeats": 3,
-  "recorded_at": "2026-10-30T20:20:30+0000",
+  "recorded_at": "2026-10-31T13:25:28+0000",
   "scenarios": [
     "bad-image-tag",
     "crashloop-bad-config-path",
     "failing-readiness-probe",
     "missing-secret",
     "oom-killed",
+    "service-selector-mismatch",
     "unschedulable-requests"
   ]
 }

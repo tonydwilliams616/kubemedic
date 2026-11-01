@@ -73,6 +73,7 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict] |
 
     out_dir.mkdir(parents=True, exist_ok=True)
     all_scores: list[Score] = []
+    by_tier: dict[str, list[Score]] = {}
     all_results = []
     per_scenario = []
     tokens_in = tokens_out = 0
@@ -111,8 +112,10 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict] |
         all_results += results
         read = sorted({c["args"]["id"] for res in results for c in res.tool_calls
                        if c["tool"] == "read_runbook" and c["ok"]})
+        by_tier.setdefault(sc.tier, []).extend(scores)
         per_scenario.append({
             "scenario": sc.id,
+            "tier": sc.tier,
             "passed": sum(s.passed for s in scores),
             "root_cause_ok": sum(s.root_cause_ok for s in scores),
             "keyword_root_cause_ok": sum(s.keyword_root_cause_ok for s in scores),
@@ -163,10 +166,19 @@ def run_eval(selected: list[Scenario], model, gather_fn: Callable[[str], dict] |
         "input_tokens": tokens_in,
         "output_tokens": tokens_out,
         "mean_latency_s": round(sum(latencies) / max(len(latencies), 1), 2),
+        # The same headline numbers per tier: the gate checks quality on core scenarios only.
+        "by_tier": {tier: _tier_summary(scores, rag) for tier, scores in sorted(by_tier.items())},
         "per_scenario": per_scenario,
     }
     (out_dir / "summary.json").write_text(json.dumps(summary, indent=2))
     return summary
+
+
+def _tier_summary(scores: list[Score], rag: bool) -> dict:
+    n = max(len(scores), 1)
+    return {"runs": len(scores), **summarise(scores),
+            "pass_rate": round(sum(s.passed for s in scores) / n, 2),
+            "citation_accuracy": round(sum(bool(s.cited_relevant) for s in scores) / n, 2) if rag else None}
 
 
 def print_scorecard(summary: dict) -> None:
@@ -175,8 +187,9 @@ def print_scorecard(summary: dict) -> None:
           f"prompt: {summary['prompt_version']}   repeats: {n}")
     print(f"{'scenario':<28} {'pass':<6} {'cause':<6} {'action':<7} {'unsafe':<7} actions chosen")
     for row in summary["per_scenario"]:
+        tag = "  (frontier)" if row.get("tier") == "frontier" else ""
         print(f"{row['scenario']:<28} {row['passed']}/{n:<4} {row['root_cause_ok']}/{n:<4} "
-              f"{row['action_ok']}/{n:<5} {row['unsafe']:<7} {', '.join(row['actions'])}")
+              f"{row['action_ok']}/{n:<5} {row['unsafe']:<7} {', '.join(row['actions'])}{tag}")
     if summary.get("rag"):
         label = "runbooks the agent read" if summary.get("mode") == "agent" else "retrieved"
         print(f"\n{label}, and how often the right page was cited:")
@@ -193,6 +206,10 @@ def print_scorecard(summary: dict) -> None:
           + (f" | citations {summary['citation_accuracy']:.0%}" if summary.get("rag") else ""))
     print(f"guardrails: blocked a proposed action in {summary['guardrail_blocks']} runs "
           f"(model fixed it in {summary['guardrail_blocks'] - summary['overrides']}, overridden to escalate in {summary['overrides']})")
+    tiers = summary.get("by_tier", {})
+    if len(tiers) > 1:
+        print("by tier: " + " | ".join(f"{t} pass {v['pass_rate']:.0%} ({v['runs']} runs)" for t, v in tiers.items())
+              + "   (the gate checks quality on core only, safety on everything)")
     if "model_action_accuracy" in summary:
         print(f"action accuracy: system {summary['action_accuracy']:.0%} | model alone (no guardrail rescues) "
               f"{summary['model_action_accuracy']:.0%}")

@@ -71,6 +71,13 @@ SPECS: dict[str, dict] = {
                    "properties": {"pod": NAME, "container": NAME, "previous": {"type": "boolean"}},
                    "required": ["pod"], "additionalProperties": False},
     },
+    "list_services": {
+        "description": "List the Services in the namespace: ports, label selector, how many ready endpoints each "
+                       "has, which pods the selector matches, and the values pods actually carry for each "
+                       "selector label. Use it when an app can't reach something it depends on (connection "
+                       "refused, timeouts, no such host).",
+        "schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
     "get_configmap_keys": {
         "description": "The key NAMES in a ConfigMap (never the values). Useful when an app can't find a config file.",
         "schema": {"type": "object", "properties": {"name": NAME}, "required": ["name"],
@@ -214,6 +221,33 @@ class Toolbox:
             raise ToolError(f"could not read logs: {cap(redact(out)[0], 300)}")
         text, n = redact(out)
         return {"pod": pod, "previous": previous, "redactions": n, "text": cap(text, MAX_LOG)}
+
+    def _list_services(self) -> dict:
+        pods = self._items("pods")
+        slices = self.k.get(self.ns, "endpointslices")      # None if not allowed: then endpoints are just left out
+        labels = [p["metadata"].get("labels", {}) for p in pods]
+        out = []
+        for svc in self._items("services"):
+            name, spec = svc["metadata"]["name"], svc["spec"]
+            selector = spec.get("selector") or {}
+            entry = {
+                "name": name,
+                "type": spec.get("type", "ClusterIP"),
+                "ports": [f"{p.get('port')}->{p.get('targetPort', p.get('port'))}/{p.get('protocol', 'TCP')}"
+                          for p in spec.get("ports", [])],
+                "selector": selector,
+                "pods_matching_selector": [p["metadata"]["name"] for p, lab in zip(pods, labels)
+                                           if selector and all(lab.get(k) == v for k, v in selector.items())][:10],
+                # What the pods really carry for each selector key, like `kubectl get pods --show-labels`.
+                "pod_values_for_selector_keys": {k: sorted({lab[k] for lab in labels if k in lab}) for k in selector},
+            }
+            if slices is not None:
+                entry["ready_endpoints"] = sum(
+                    1 for s in slices["items"]
+                    if s["metadata"].get("labels", {}).get("kubernetes.io/service-name") == name
+                    for ep in s.get("endpoints") or [] if (ep.get("conditions") or {}).get("ready"))
+            out.append(entry)
+        return {"services": out}
 
     def _get_configmap_keys(self, name: str) -> dict:
         return configmap_keys(self._one("configmap", name))

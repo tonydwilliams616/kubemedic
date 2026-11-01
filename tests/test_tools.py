@@ -143,3 +143,43 @@ def test_the_advertised_schema_is_looser_but_the_enforced_one_still_blocks():
     shown = next(s for s in tb.bedrock_specs() if s["toolSpec"]["name"] == "get_deployment")
     assert "pattern" not in shown["toolSpec"]["inputSchema"]["json"]["properties"]["name"]
     assert "invalid arguments" in tb.call("get_deployment", {"name": "--all-namespaces"})["error"]
+
+
+
+def pod_with(name, **labels):
+    return {"metadata": {"name": name, "labels": labels}, "spec": {"containers": []}, "status": {}}
+
+
+SERVICE = {"metadata": {"name": "orders-db"},
+           "spec": {"selector": {"app": "orders-database"}, "ports": [{"port": 5432, "targetPort": 80}]}}
+
+
+def test_list_services_shows_a_selector_that_matches_no_pods():
+    k = FakeKubectl(objects={
+        ("pods",): {"items": [pod_with("orders-db-1", app="orders-db"), pod_with("orders-2", app="orders")]},
+        ("services",): {"items": [SERVICE]},
+        ("endpointslices",): {"items": [{"metadata": {"labels": {"kubernetes.io/service-name": "orders-db"}},
+                                         "endpoints": []}]},
+    })
+    svc = Toolbox(NS, k).call("list_services", {})["services"][0]
+    assert svc["selector"] == {"app": "orders-database"} and svc["pods_matching_selector"] == []
+    assert svc["ready_endpoints"] == 0 and svc["ports"] == ["5432->80/TCP"]
+    assert svc["pod_values_for_selector_keys"] == {"app": ["orders", "orders-db"]}     # the typo, at a glance
+
+
+def test_list_services_counts_ready_endpoints_and_matches_pods():
+    healthy = SERVICE | {"spec": {"selector": {"app": "orders-db"}, "ports": [{"port": 5432, "targetPort": 80}]}}
+    k = FakeKubectl(objects={
+        ("pods",): {"items": [pod_with("orders-db-1", app="orders-db")]},
+        ("services",): {"items": [healthy]},
+        ("endpointslices",): {"items": [{"metadata": {"labels": {"kubernetes.io/service-name": "orders-db"}},
+                                         "endpoints": [{"conditions": {"ready": True}}, {"conditions": {"ready": False}}]}]},
+    })
+    svc = Toolbox(NS, k).call("list_services", {})["services"][0]
+    assert svc["pods_matching_selector"] == ["orders-db-1"] and svc["ready_endpoints"] == 1
+
+
+def test_list_services_works_without_permission_for_endpoints():
+    k = FakeKubectl(objects={("pods",): {"items": []}, ("services",): {"items": [SERVICE]}})   # endpointslices denied
+    svc = Toolbox(NS, k).call("list_services", {})["services"][0]
+    assert "ready_endpoints" not in svc and svc["name"] == "orders-db"

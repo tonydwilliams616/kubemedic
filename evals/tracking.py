@@ -84,6 +84,9 @@ def diagnosis_record(summary: dict, pricing: dict) -> tuple[dict, dict]:
             metrics["judge_cost_usd"] = judge_cost
     for row in summary.get("per_scenario", []):
         metrics[f"scenario/{row['scenario']}/pass_rate"] = round(row["passed"] / max(row["repeats"], 1), 2)
+    for tier, values in summary.get("by_tier", {}).items():
+        for k in ("pass_rate", "root_cause_accuracy", "action_accuracy"):
+            metrics[f"tier/{tier}/{k}"] = values[k]
     return params, metrics
 
 
