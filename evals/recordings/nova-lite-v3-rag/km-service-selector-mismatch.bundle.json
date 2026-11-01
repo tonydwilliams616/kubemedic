@@ -1,0 +1,280 @@
+{
+ "namespace": "km-service-selector-mismatch",
+ "deployments": [
+  {
+   "name": "orders",
+   "replicas": {
+    "replicas": 1,
+    "readyReplicas": 0,
+    "updatedReplicas": 1,
+    "availableReplicas": 0,
+    "desired": 1
+   },
+   "conditions": [
+    {
+     "type": "Progressing",
+     "status": "True",
+     "reason": "NewReplicaSetAvailable",
+     "message": "ReplicaSet \"orders-7cd4775495\" has successfully progressed."
+    },
+    {
+     "type": "Available",
+     "status": "False",
+     "reason": "MinimumReplicasUnavailable",
+     "message": "Deployment does not have minimum availability."
+    }
+   ],
+   "containers": [
+    {
+     "name": "orders",
+     "image": "busybox:1.36",
+     "env": [],
+     "resources": {
+      "limits": {
+       "memory": "32Mi"
+      },
+      "requests": {
+       "cpu": "10m",
+       "memory": "16Mi"
+      }
+     },
+     "readiness_probe": null,
+     "liveness_probe": null
+    }
+   ],
+   "configmaps_used": [],
+   "rollout_history": [
+    {
+     "revision": 1,
+     "current": true,
+     "change_cause": "release 1.8.0",
+     "images": [
+      "busybox:1.36"
+     ],
+     "changes_from_previous": null
+    }
+   ]
+  },
+  {
+   "name": "orders-db",
+   "replicas": {
+    "replicas": 1,
+    "readyReplicas": 1,
+    "updatedReplicas": 1,
+    "availableReplicas": 1,
+    "desired": 1
+   },
+   "conditions": [
+    {
+     "type": "Available",
+     "status": "True",
+     "reason": "MinimumReplicasAvailable",
+     "message": "Deployment has minimum availability."
+    },
+    {
+     "type": "Progressing",
+     "status": "True",
+     "reason": "NewReplicaSetAvailable",
+     "message": "ReplicaSet \"orders-db-65b446b7dc\" has successfully progressed."
+    }
+   ],
+   "containers": [
+    {
+     "name": "db",
+     "image": "nginx:1.27-alpine",
+     "env": [],
+     "resources": {
+      "limits": {
+       "memory": "64Mi"
+      },
+      "requests": {
+       "cpu": "10m",
+       "memory": "16Mi"
+      }
+     },
+     "readiness_probe": null,
+     "liveness_probe": null
+    }
+   ],
+   "configmaps_used": [],
+   "rollout_history": [
+    {
+     "revision": 1,
+     "current": true,
+     "change_cause": null,
+     "images": [
+      "nginx:1.27-alpine"
+     ],
+     "changes_from_previous": null
+    }
+   ]
+  }
+ ],
+ "pods": [
+  {
+   "name": "orders-7cd4775495-zn55b",
+   "owner": "orders-7cd4775495",
+   "phase": "Running",
+   "ready": "0/1",
+   "containers": [
+    {
+     "name": "orders",
+     "image": "docker.io/library/busybox:1.36",
+     "ready": false,
+     "restarts": 5,
+     "state": {
+      "waiting": "CrashLoopBackOff",
+      "message": "back-off 2m40s restarting failed container=orders pod=orders-7cd4775495-zn55b_<namespace>(b696384b-c521-4aff-9c5e-5ca680cb7b46)"
+     },
+     "last_terminated": {
+      "reason": "Error",
+      "exit_code": 1
+     }
+    }
+   ],
+   "problem_conditions": [
+    {
+     "type": "Ready",
+     "reason": "ContainersNotReady",
+     "message": "containers with unready status: [orders]"
+    },
+    {
+     "type": "ContainersReady",
+     "reason": "ContainersNotReady",
+     "message": "containers with unready status: [orders]"
+    }
+   ]
+  },
+  {
+   "name": "orders-db-65b446b7dc-plkhs",
+   "owner": "orders-db-65b446b7dc",
+   "phase": "Running",
+   "ready": "1/1",
+   "containers": [
+    {
+     "name": "db",
+     "image": "docker.io/library/nginx:1.27-alpine",
+     "ready": true,
+     "restarts": 0,
+     "state": {
+      "running": true
+     }
+    }
+   ],
+   "problem_conditions": []
+  }
+ ],
+ "events": [
+  {
+   "type": "Normal",
+   "reason": "Scheduled",
+   "object": "Pod/orders-7cd4775495-zn55b",
+   "count": 1,
+   "message": "Successfully assigned <namespace>/orders-7cd4775495-zn55b to kubemedic-worker"
+  },
+  {
+   "type": "Normal",
+   "reason": "SuccessfulCreate",
+   "object": "ReplicaSet/orders-7cd4775495",
+   "count": 1,
+   "message": "Created pod: orders-7cd4775495-zn55b"
+  },
+  {
+   "type": "Normal",
+   "reason": "Scheduled",
+   "object": "Pod/orders-db-65b446b7dc-plkhs",
+   "count": 1,
+   "message": "Successfully assigned <namespace>/orders-db-65b446b7dc-plkhs to kubemedic-worker"
+  },
+  {
+   "type": "Normal",
+   "reason": "Pulled",
+   "object": "Pod/orders-db-65b446b7dc-plkhs",
+   "count": 1,
+   "message": "Container image \"nginx:1.27-alpine\" already present on machine"
+  },
+  {
+   "type": "Normal",
+   "reason": "Created",
+   "object": "Pod/orders-db-65b446b7dc-plkhs",
+   "count": 1,
+   "message": "Created container db"
+  },
+  {
+   "type": "Normal",
+   "reason": "SuccessfulCreate",
+   "object": "ReplicaSet/orders-db-65b446b7dc",
+   "count": 1,
+   "message": "Created pod: orders-db-65b446b7dc-plkhs"
+  },
+  {
+   "type": "Normal",
+   "reason": "ScalingReplicaSet",
+   "object": "Deployment/orders-db",
+   "count": 1,
+   "message": "Scaled up replica set orders-db-65b446b7dc to 1"
+  },
+  {
+   "type": "Normal",
+   "reason": "ScalingReplicaSet",
+   "object": "Deployment/orders",
+   "count": 1,
+   "message": "Scaled up replica set orders-7cd4775495 to 1"
+  },
+  {
+   "type": "Normal",
+   "reason": "Started",
+   "object": "Pod/orders-db-65b446b7dc-plkhs",
+   "count": 1,
+   "message": "Started container db"
+  },
+  {
+   "type": "Normal",
+   "reason": "Pulled",
+   "object": "Pod/orders-7cd4775495-zn55b",
+   "count": 5,
+   "message": "Container image \"busybox:1.36\" already present on machine"
+  },
+  {
+   "type": "Normal",
+   "reason": "Created",
+   "object": "Pod/orders-7cd4775495-zn55b",
+   "count": 5,
+   "message": "Created container orders"
+  },
+  {
+   "type": "Normal",
+   "reason": "Started",
+   "object": "Pod/orders-7cd4775495-zn55b",
+   "count": 5,
+   "message": "Started container orders"
+  },
+  {
+   "type": "Warning",
+   "reason": "BackOff",
+   "object": "Pod/orders-7cd4775495-zn55b",
+   "count": 25,
+   "message": "Back-off restarting failed container orders in pod orders-7cd4775495-zn55b_<namespace>(b696384b-c521-4aff-9c5e-5ca680cb7b46)"
+  }
+ ],
+ "configmaps": [],
+ "logs": [
+  {
+   "pod": "orders-7cd4775495-zn55b",
+   "container": "orders",
+   "previous": false,
+   "ok": true,
+   "redactions": 0,
+   "text": "ERROR: cannot reach database orders-db:5432: wget: can't connect to remote host (10.96.73.166): Connection refused\n"
+  },
+  {
+   "pod": "orders-7cd4775495-zn55b",
+   "container": "orders",
+   "previous": true,
+   "ok": true,
+   "redactions": 0,
+   "text": "ERROR: cannot reach database orders-db:5432: wget: can't connect to remote host (10.96.73.166): Connection refused\n"
+  }
+ ],
+ "errors": []
+}

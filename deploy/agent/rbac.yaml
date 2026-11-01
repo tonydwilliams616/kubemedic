@@ -39,6 +39,14 @@ rules:
   - apiGroups: [""]
     resources: [configmaps]
     verbs: [get, list]
+  # Services and their endpoints, for faults where an app can't reach what it depends on
+  # (a Service whose selector matches no pods). Read only; neither holds secret values.
+  - apiGroups: [""]
+    resources: [services]
+    verbs: [get, list]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list]
   # Not granted, on purpose: secrets, pods/exec, pods/portforward, and every
   # write verb (create, update, patch, delete). Fixes will go through a
   # separate executor with its own identity in Phase 3.

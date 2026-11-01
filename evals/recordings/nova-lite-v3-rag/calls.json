@@ -1,211 +1,243 @@
 {
- "cd09e8d51ee07f57": [
+ "dd71da5144fc2717": [
   {
-   "text": "{\"root_cause\": \"The image 'nginx:1.27.99-alpine' does not exist in the registry.\", \"evidence\": [\"\\\"message\\\": \\\"rpc error: code = NotFound desc = failed to pull and unpack image \\\\\\\"docker.io/library/nginx:1.27.99-alpine\\\\\\\": failed to resolve reference \\\\\\\"docker.io/library/nginx:1.27.99-alpine\\\\\\\": docker.io/library/nginx:1.27.99-alpine: not found\\\"\", \"Pod/web-6679475cb5-5sxpz\", \"Error: ErrImagePull\", \"Error: ImagePullBackOff\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/web\", \"reason\": \"The current revision changed the image to 'nginx:1.27.99-alpine', which does not exist. Rolling back to the previous revision with the working image 'nginx:1.27-alpine' will restore service.\"}, \"confidence\": \"high\"}",
+   "text": "{\"root_cause\": \"The image 'nginx:1.27.99-alpine' does not exist in the registry.\", \"evidence\": [\"\\\"Failed to pull image 'nginx:1.27.99-alpine': rpc error: code = NotFound desc = failed to pull and unpack image 'docker.io/library/nginx:1.27.99-alpine': failed to resolve reference 'docker.io/library/nginx:1.27.99-alpine': docker.io/library/nginx:1.27.99-alpine: not found\\\"\", \"Error from server (BadRequest): container \\\"web\\\" in pod \\\"web-6679475cb5-t7nhl\\\" is waiting to start: trying and failing to pull image\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/web\", \"reason\": \"The current revision changed the image to 'nginx:1.27.99-alpine', which does not exist. Rolling back to the previous revision with the working image 'nginx:1.27-alpine' will restore service.\"}, \"confidence\": \"high\"}",
    "usage": {
-    "input_tokens": 3858,
-    "output_tokens": 235
+    "input_tokens": 3878,
+    "output_tokens": 257
    }
   },
   {
-   "text": "{\"root_cause\": \"The image 'nginx:1.27.99-alpine' does not exist in the registry.\", \"evidence\": [\"\\\"message\\\": \\\"rpc error: code = NotFound desc = failed to pull and unpack image \\\\\\\"docker.io/library/nginx:1.27.99-alpine\\\\\\\": failed to resolve reference \\\\\\\"docker.io/library/nginx:1.27.99-alpine\\\\\\\": docker.io/library/nginx:1.27.99-alpine: not found\\\"\", \"Pod/web-6679475cb5-5sxpz\", \"Error: ErrImagePull\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/web\", \"reason\": \"The current revision changed the image to 'nginx:1.27.99-alpine', which does not exist. Rolling back to the previous revision 'nginx:1.27-alpine' will restore service.\"}, \"confidence\": \"high\"}",
+   "text": "{\"root_cause\": \"The image 'nginx:1.27.99-alpine' does not exist in the registry.\", \"evidence\": [\"\\\"Failed to pull image 'nginx:1.27.99-alpine': rpc error: code = NotFound desc = failed to pull and unpack image 'docker.io/library/nginx:1.27.99-alpine': failed to resolve reference 'docker.io/library/nginx:1.27.99-alpine': docker.io/library/nginx:1.27.99-alpine: not found\\\"\", \"Error from server (BadRequest): container \\\"web\\\" in pod \\\"web-6679475cb5-t7nhl\\\" is waiting to start: trying and failing to pull image\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/web\", \"reason\": \"The current revision changed the image to 'nginx:1.27.99-alpine', which does not exist. Rolling back to the previous revision 'nginx:1.27-alpine' will restore service.\"}, \"confidence\": \"high\", \"citations\": [\"image-pull-errors\"]}",
    "usage": {
-    "input_tokens": 3858,
-    "output_tokens": 223
+    "input_tokens": 3878,
+    "output_tokens": 264
    }
   },
   {
-   "text": "{\"root_cause\": \"The image 'nginx:1.27.99-alpine' does not exist in the registry.\", \"evidence\": [\"\\\"message\\\": \\\"rpc error: code = NotFound desc = failed to pull and unpack image \\\\\\\"docker.io/library/nginx:1.27.99-alpine\\\\\\\": failed to resolve reference \\\\\\\"docker.io/library/nginx:1.27.99-alpine\\\\\\\": docker.io/library/nginx:1.27.99-alpine: not found\\\"\", \"Pod/web-6679475cb5-5sxpz\", \"Back-off pulling image \\\"nginx:1.27.99-alpine\\\"\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/web\", \"reason\": \"The current revision changed the image to a non-existent tag. Rolling back to the previous revision will restore service.\"}, \"confidence\": \"high\"}",
+   "text": "{\"root_cause\": \"The image 'nginx:1.27.99-alpine' does not exist in the registry.\", \"evidence\": [\"\\\"Failed to pull image 'nginx:1.27.99-alpine': rpc error: code = NotFound desc = failed to pull and unpack image 'docker.io/library/nginx:1.27.99-alpine': failed to resolve reference 'docker.io/library/nginx:1.27.99-alpine': docker.io/library/nginx:1.27.99-alpine: not found\\\"\", \"'Back-off pulling image 'nginx:1.27.99-alpine''\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/web\", \"reason\": \"The current revision changed the image to 'nginx:1.27.99-alpine', which does not exist. Rolling back to the previous revision will restore service.\"}, \"confidence\": \"high\", \"citations\": [\"image-pull-errors\"]}",
    "usage": {
-    "input_tokens": 3858,
-    "output_tokens": 214
+    "input_tokens": 3878,
+    "output_tokens": 233
    }
   }
  ],
- "97e4f1a67e18d6c3": [
+ "52c8f0da17dd0348": [
   {
-   "text": "{\"root_cause\": \"The image 'nginx:1.27.99-alpine' does not exist in the registry.\", \"evidence\": [\"\\\"message\\\": \\\"rpc error: code = NotFound desc = failed to pull and unpack image \\\\\\\"docker.io/library/nginx:1.27.99-alpine\\\\\\\": failed to resolve reference \\\\\\\"docker.io/library/nginx:1.27.99-alpine\\\\\\\": docker.io/library/nginx:1.27.99-alpine: not found\\\"\", \"Pod/web-6679475cb5-5sxpz\", \"Error: ErrImagePull\", \"Error: ImagePullBackOff\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/web\", \"reason\": \"The current revision changed the image to 'nginx:1.27.99-alpine', which does not exist. Rolling back to the previous revision with the working image 'nginx:1.27-alpine' will restore service.\"}, \"confidence\": \"high\", \"citations\": [\"image-pull-errors\"]}",
+   "text": "{\"root_cause\": \"The image 'nginx:1.27.99-alpine' does not exist in the registry.\", \"evidence\": [\"\\\"Failed to pull image 'nginx:1.27.99-alpine': rpc error: code = NotFound desc = failed to pull and unpack image 'docker.io/library/nginx:1.27.99-alpine': failed to resolve reference 'docker.io/library/nginx:1.27.99-alpine': docker.io/library/nginx:1.27.99-alpine: not found\\\"\", \"Error from server (BadRequest): container \\\"web\\\" in pod \\\"web-6679475cb5-t7nhl\\\" is waiting to start: trying and failing to pull image\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/web\", \"reason\": \"The current revision changed the image to 'nginx:1.27.99-alpine', which does not exist. Rolling back to the previous revision with the working image 'nginx:1.27-alpine' will restore service.\"}, \"confidence\": \"high\", \"citations\": [\"image-pull-errors\"]}",
    "usage": {
-    "input_tokens": 4124,
-    "output_tokens": 246
+    "input_tokens": 4166,
+    "output_tokens": 268
    }
   }
  ],
- "2bbb4a8cb72024ea": [
+ "a287b865b7a37eef": [
   {
-   "text": "{\"root_cause\": \"The image 'nginx:1.27.99-alpine' does not exist in the registry.\", \"evidence\": [\"\\\"message\\\": \\\"rpc error: code = NotFound desc = failed to pull and unpack image \\\\\\\"docker.io/library/nginx:1.27.99-alpine\\\\\\\": failed to resolve reference \\\\\\\"docker.io/library/nginx:1.27.99-alpine\\\\\\\": docker.io/library/nginx:1.27.99-alpine: not found\\\"\", \"Pod/web-6679475cb5-5sxpz\", \"Error: ErrImagePull\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/web\", \"reason\": \"The current revision changed the image to 'nginx:1.27.99-alpine', which does not exist. Rolling back to the previous revision 'nginx:1.27-alpine' will restore service.\"}, \"confidence\": \"high\", \"citations\": [\"image-pull-errors\"]}",
+   "text": "{\n  \"root_cause\": \"The application fails at startup because the expected config file is missing. The environment variable `CONFIG_PATH` was changed to point to a non-existent file `/etc/app/settings.yaml`.\",\n  \"evidence\": [\n    \"The pod is in CrashLoopBackOff with exit code 1, indicating an application error.\",\n    \"The logs show 'FATAL: config file /etc/app/settings.yaml not found', indicating the application cannot start because the config file is missing.\",\n    \"The current revision changed the environment variable `CONFIG_PATH` to point to `/etc/app/settings.yaml`, which does not exist.\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/api\",\n    \"reason\": \"The current revision introduced a misconfiguration that prevents the application from starting. Rolling back to the previous revision will restore service.\"\n  },\n  \"confidence\": \"high\",\n  \"citations\": [\"crashloopbackoff\"]\n}",
    "usage": {
-    "input_tokens": 4112,
-    "output_tokens": 234
-   }
-  }
- ],
- "e0b9b3137257bb32": [
-  {
-   "text": "{\"root_cause\": \"The image 'nginx:1.27.99-alpine' does not exist in the registry.\", \"evidence\": [\"\\\"message\\\": \\\"rpc error: code = NotFound desc = failed to pull and unpack image \\\\\\\"docker.io/library/nginx:1.27.99-alpine\\\\\\\": failed to resolve reference \\\\\\\"docker.io/library/nginx:1.27.99-alpine\\\\\\\": docker.io/library/nginx:1.27.99-alpine: not found\\\"\", \"Pod/web-6679475cb5-5sxpz\", \"Back-off pulling image \\\"nginx:1.27.99-alpine\\\"\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/web\", \"reason\": \"The current revision changed the image to a non-existent tag. Rolling back to the previous revision will restore service.\"}, \"confidence\": \"high\", \"citations\": [\"image-pull-errors\"]}",
-   "usage": {
-    "input_tokens": 4103,
-    "output_tokens": 225
-   }
-  }
- ],
- "6488bb8fff451588": [
-  {
-   "text": "{\n  \"root_cause\": \"The application fails at startup because the expected config file /etc/app/settings.yaml does not exist. The current revision changed the environment variable CONFIG_PATH to point to /etc/app/settings.yaml, but the ConfigMap only contains config.yaml.\",\n  \"evidence\": [\n    \"The pod logs show 'FATAL: config file /etc/app/settings.yaml not found'.\",\n    \"The current revision changed the environment variable CONFIG_PATH to point to /etc/app/settings.yaml, but the ConfigMap only contains config.yaml.\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/api\",\n    \"reason\": \"The current revision introduced a configuration error by changing the CONFIG_PATH to a non-existent file. Rolling back to the previous revision will restore service.\"\n  },\n  \"confidence\": \"high\",\n  \"citations\": [\n    \"crashloopbackoff\"\n  ]\n}",
-   "usage": {
-    "input_tokens": 3744,
-    "output_tokens": 214
+    "input_tokens": 4164,
+    "output_tokens": 217
    }
   },
   {
-   "text": "{\n  \"root_cause\": \"The application fails at startup because the expected config file /etc/app/settings.yaml does not exist. The environment variable CONFIG_PATH was changed in the current revision to point to a non-existent file.\",\n  \"evidence\": [\n    \"The pod logs show 'FATAL: config file /etc/app/settings.yaml not found'.\",\n    \"The current revision changed the CONFIG_PATH environment variable from '/etc/app/config.yaml' to '/etc/app/settings.yaml'.\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/api\",\n    \"reason\": \"The current revision introduced a configuration error that prevents the application from starting. Rolling back to the previous revision will restore service.\"\n  },\n  \"confidence\": \"high\",\n  \"citations\": [\"crashloopbackoff\"]\n}",
+   "text": "{\n  \"root_cause\": \"The application fails at startup because the expected config file is missing. The environment variable CONFIG_PATH points to /etc/app/settings.yaml, but the ConfigMap 'api-config' only contains 'config.yaml'.\",\n  \"evidence\": [\n    \"The pod logs show 'FATAL: config file /etc/app/settings.yaml not found'.\",\n    \"The current revision changed the CONFIG_PATH environment variable to '/etc/app/settings.yaml', but the ConfigMap 'api-config' only contains 'config.yaml'.\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/api\",\n    \"reason\": \"The current revision introduced the wrong config file path, causing the application to fail at startup. Rolling back to the previous revision will restore service.\"\n  },\n  \"confidence\": \"high\",\n  \"citations\": [\"crashloopbackoff\"]\n}",
    "usage": {
-    "input_tokens": 3744,
-    "output_tokens": 191
+    "input_tokens": 4164,
+    "output_tokens": 206
    }
   },
   {
-   "text": "{\n  \"root_cause\": \"The application fails at startup because the expected config file /etc/app/settings.yaml is not found. The current revision changed the environment variable CONFIG_PATH to point to /etc/app/settings.yaml, but the ConfigMap only contains config.yaml.\",\n  \"evidence\": [\n    \"The pod logs show 'FATAL: config file /etc/app/settings.yaml not found'.\",\n    \"The current revision changed the environment variable CONFIG_PATH to '/etc/app/settings.yaml'.\",\n    \"The ConfigMap 'api-config' contains only 'config.yaml'.\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/api\",\n    \"reason\": \"The current revision introduced a configuration error by changing the CONFIG_PATH to a non-existent file. Rolling back to the previous revision will restore service.\"\n  },\n  \"confidence\": \"high\",\n  \"citations\": [\n  \"crashloopbackoff\"\n  ]\n}",
+   "text": "{\n  \"root_cause\": \"The application fails at startup because the expected config file is missing. The environment variable CONFIG_PATH was changed from \\\"/etc/app/config.yaml\\\" to \\\"/etc/app/settings.yaml\\\" in the current revision, but the ConfigMap only contains \\\"config.yaml\\\".\",\n  \"evidence\": [\n    \"The pod is in CrashLoopBackOff with exit code 1, indicating an application error.\",\n    \"The logs show 'FATAL: config file /etc/app/settings.yaml not found', indicating the application is looking for a config file that does not exist.\",\n    \"The current revision changed the CONFIG_PATH environment variable to '/etc/app/settings.yaml', but the ConfigMap only contains 'config.yaml'.\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/api\",\n    \"reason\": \"The current revision introduced a misconfiguration by changing the CONFIG_PATH to a non-existent file. Rolling back to the previous revision will restore the correct configuration.\"\n  },\n  \"confidence\": \"high\",\n  \"citations\": [\"crashloopbackoff\"]\n}",
    "usage": {
-    "input_tokens": 3744,
-    "output_tokens": 221
+    "input_tokens": 4164,
+    "output_tokens": 254
    }
   }
  ],
- "3492354ba50463d0": [
+ "2e8983394b2323a3": [
   {
-   "text": "{\n  \"root_cause\": \"The readiness probe is pointing to the wrong path. The current revision changed the readiness probe to point to '/healthz:80', but the application does not serve anything at that path.\",\n  \"evidence\": [\n    \"Readiness probe failed: HTTP probe failed with statuscode: 404\",\n    \"container frontend: readiness_probe { \\\"httpGet\\\": \\\"/:80\\\"} -> { \\\"httpGet\\\": \\\"/healthz:80\\\"}\",\n    \"open() \\\"/usr/share/nginx/html/healthz\\\" failed (2: No such file or directory)\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/frontend\",\n    \"reason\": \"The readiness probe was changed in the current revision, and an earlier revision exists. Rolling back will restore service.\"\n  },\n  \"confidence\": \"high\",\n  \"citations\": [\"readiness-probe-failing\"]\n}",
+   "text": "{\n  \"root_cause\": \"The readiness probe is pointing to the wrong path. The probe is checking for '/healthz' but the application does not serve anything at that path.\",\n  \"evidence\": [\n    \"Readiness probe failed: HTTP probe failed with statuscode: 404\",\n    \"open() \\\"/usr/share/nginx/html/healthz\\\" failed (2: No such file or directory)\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/frontend\",\n    \"reason\": \"The readiness probe was changed in the current revision to point to '/healthz', which does not exist. Rolling back to the previous revision will restore service.\"\n  },\n  \"confidence\": \"high\",\n  \"citations\": [\n    \"readiness-probe-failing\"\n  ]\n}",
    "usage": {
-    "input_tokens": 4729,
-    "output_tokens": 210
+    "input_tokens": 4711,
+    "output_tokens": 180
    }
   },
   {
-   "text": "{\n  \"root_cause\": \"The readiness probe is pointing to the wrong path. The current revision changed the readiness probe from '/healthz:80' to '/' but the file '/usr/share/nginx/html/healthz' does not exist.\",\n  \"evidence\": [\n    \"Readiness probe failed: HTTP probe failed with statuscode: 404\",\n    \"2026/10/30 20:19:36 [error] 34#34: *2 open() \\\"/usr/share/nginx/html/healthz\\\" failed (2: No such file or directory), client: 10.244.1.1, server: localhost, request: \\\"GET /healthz HTTP/1.1\\\", host: \\\"10.244.1.52:80\\\"\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/frontend\",\n    \"reason\": \"The readiness probe was changed in the current revision, and an earlier revision exists. Rolling back will restore service.\"\n  },\n  \"confidence\": \"high\",\n  \"citations\": [\"readiness-probe-failing\"]\n}",
+   "text": "{\n  \"root_cause\": \"The readiness probe is pointing to the wrong path, causing the probe to fail with a 404 status code.\",\n  \"evidence\": [\n    \"Readiness probe failed: HTTP probe failed with statuscode: 404\",\n    \"open() \\\"/usr/share/nginx/html/healthz\\\" failed (2: No such file or directory)\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/frontend\",\n    \"reason\": \"The readiness probe was changed in the current revision to point to the wrong path. Rolling back to the previous revision will restore service.\"\n  },\n  \"confidence\": \"high\",\n  \"citations\": [\"readiness-probe-failing\"]\n}",
    "usage": {
-    "input_tokens": 4729,
-    "output_tokens": 265
+    "input_tokens": 4711,
+    "output_tokens": 164
    }
   },
   {
-   "text": "{\n  \"root_cause\": \"The readiness probe is pointing to the wrong path. The current revision changed the readiness probe from '/healthz:80' to '/' but the '/healthz' endpoint does not exist in the nginx container.\",\n  \"evidence\": [\n    \"Readiness probe failed: HTTP probe failed with statuscode: 404\",\n    \"container frontend: readiness_probe {\\\"httpGet\\\": \\\"/:80\\\"} -> {\\\"httpGet\\\": \\\"/healthz:80\\\"}\",\n    \"open() \\\"/usr/share/nginx/html/healthz\\\" failed (2: No such file or directory)\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/frontend\",\n    \"reason\": \"The readiness probe was changed in the current revision and an earlier revision exists. Rolling back will restore service.\"\n  },\n  \"confidence\": \"high\",\n  \"citations\": [\"readiness-probe-failing\"]\n}",
+   "text": "{\n  \"root_cause\": \"The readiness probe is pointing to the wrong path. The probe is configured to check '/healthz:80', but the logs show that the probe is trying to access '/usr/share/nginx/html/healthz', which does not exist, resulting in a 404 error.\",\n  \"evidence\": [\n    \"Readiness probe failed: HTTP probe failed with statuscode: 404\",\n    \"open() \\\"/usr/share/nginx/html/healthz\\\" failed (2: No such file or directory)\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/frontend\",\n    \"reason\": \"The readiness probe was changed in the current revision to point to the wrong path. Rolling back to the previous revision will restore service.\"\n  },\n  \"confidence\": \"high\",\n  \"citations\": [\"readiness-probe-failing\"]\n}",
    "usage": {
-    "input_tokens": 4729,
-    "output_tokens": 213
+    "input_tokens": 4711,
+    "output_tokens": 202
    }
   }
  ],
- "eb2588369143e075": [
+ "23f3dad5c4752d8f": [
   {
-   "text": "{\"root_cause\": \"The secret 'payments-db' does not exist in the namespace.\", \"evidence\": [\"secret \\\"payments-db\\\" not found\", \"Error from server (BadRequest): container \\\"payments\\\" in pod \\\"payments-66449bf7bd-p52f8\\\" is waiting to start: CreateContainerConfigError\"], \"proposed_action\": {\"action\": \"escalate\", \"reason\": \"The secret 'payments-db' does not exist in the namespace. Creating or restoring credentials is a human task.\"}, \"confidence\": \"high\"}",
+   "text": "{\"root_cause\": \"The secret 'payments-db' does not exist in the namespace, causing the container to fail to start with a CreateContainerConfigError.\", \"evidence\": [\"secret \\\"payments-db\\\" not found\", \"Error from server (BadRequest): container \\\"payments\\\" in pod \\\"payments-66449bf7bd-p52f8\\\" is waiting to start: CreateContainerConfigError\"], \"proposed_action\": {\"action\": \"escalate\", \"target\": \"Deployment/payments\", \"reason\": \"The missing secret is not something the current revision introduced, and there is no earlier revision to roll back to. A human needs to create the secret with the correct values.\"}, \"confidence\": \"high\"}",
    "usage": {
     "input_tokens": 2720,
-    "output_tokens": 120
+    "output_tokens": 153
    }
   },
   {
-   "text": "{\"root_cause\": \"The secret \\\"payments-db\\\" does not exist in the namespace.\", \"evidence\": [\"secret \\\"payments-db\\\" not found\", \"Error from server (BadRequest): container \\\"payments\\\" in pod \\\"payments-66449bf7bd-p52f8\\\" is waiting to start: CreateContainerConfigError\"], \"proposed_action\": {\"action\": \"escalate\", \"target\": \"Deployment/payments\", \"reason\": \"The secret 'payments-db' does not exist in the namespace. Creating or restoring credentials is a human task.\"}, \"confidence\": \"high\", \"citations\": [\"createcontainerconfigerror\"]}",
+   "text": "{\"root_cause\": \"The secret 'payments-db' does not exist in the namespace.\", \"evidence\": [\"secret \\\"payments-db\\\" not found\", \"Error from server (BadRequest): container \\\"payments\\\" in pod \\\"payments-66449bf7bd-p52f8\\\" is waiting to start: CreateContainerConfigError\"], \"proposed_action\": {\"action\": \"escalate\", \"target\": \"Deployment/payments\", \"reason\": \"The secret 'payments-db' does not exist in the namespace. Creating or restoring credentials is a human task.\"}, \"confidence\": \"high\", \"citations\": [\"createcontainerconfigerror\"]}",
    "usage": {
     "input_tokens": 2720,
     "output_tokens": 138
    }
   },
   {
-   "text": "{\"root_cause\": \"The secret \\\"payments-db\\\" does not exist in the namespace.\", \"evidence\": [\"secret \\\"payments-db\\\" not found\", \"Error from server (BadRequest): container \\\"payments\\\" in pod \\\"payments-66449bf7bd-p52f8\\\" is waiting to start: CreateContainerConfigError\"], \"proposed_action\": {\"action\": \"escalate\", \"reason\": \"The secret does not exist, and creating or restoring it is a human task.\"}, \"confidence\": \"high\"}",
+   "text": "{\"root_cause\": \"The secret 'payments-db' does not exist in the namespace, causing the 'payments' container to fail to start.\", \"evidence\": [\"The pod 'payments-66449bf7bd-p52f8' is in 'Pending' state with a 'CreateContainerConfigError' message:'secret \\\"payments-db\\\" not found'.\", \"The container 'payments' references an environment variable 'DB_PASSWORD' from a secret 'payments-db' with key 'password', but this secret is missing.\", \"The event log confirms the secret 'payments-db' is not found.\"], \"proposed_action\": {\"action\": \"escalate\", \"target\": \"\", \"reason\": \"The missing secret 'payments-db' is likely a human error that needs to be corrected.\"}, \"confidence\": \"high\"}",
    "usage": {
     "input_tokens": 2720,
-    "output_tokens": 113
+    "output_tokens": 180
    }
   }
  ],
- "fcf44e47d3781b13": [
+ "073b71ecfc474a1a": [
   {
-   "text": "{\"root_cause\": \"The secret 'payments-db' does not exist in the namespace.\", \"evidence\": [\"secret \\\"payments-db\\\" not found\", \"Error from server (BadRequest): container \\\"payments\\\" in pod \\\"payments-66449bf7bd-p52f8\\\" is waiting to start: CreateContainerConfigError\"], \"proposed_action\": {\"action\": \"escalate\", \"reason\": \"The secret 'payments-db' does not exist in the namespace. Creating or restoring credentials is a human task.\"}, \"confidence\": \"high\", \"citations\": [\"createcontainerconfigerror\"]}",
+   "text": "{\"root_cause\": \"The secret 'payments-db' does not exist in the namespace, causing the container to fail to start with a CreateContainerConfigError.\", \"evidence\": [\"secret \\\"payments-db\\\" not found\", \"Error from server (BadRequest): container \\\"payments\\\" in pod \\\"payments-66449bf7bd-p52f8\\\" is waiting to start: CreateContainerConfigError\"], \"proposed_action\": {\"action\": \"escalate\", \"target\": \"Deployment/payments\", \"reason\": \"The missing secret is not something the current revision introduced, and there is no earlier revision to roll back to. A human needs to create the secret with the correct values.\"}, \"confidence\": \"high\", \"citations\": [\"createcontainerconfigerror\"]}",
    "usage": {
-    "input_tokens": 2871,
-    "output_tokens": 130
+    "input_tokens": 2904,
+    "output_tokens": 163
    }
   }
  ],
- "ebcdc11384b2f502": [
+ "253c084b07b4a94b": [
   {
-   "text": "{\"root_cause\": \"The secret \\\"payments-db\\\" does not exist in the namespace.\", \"evidence\": [\"secret \\\"payments-db\\\" not found\", \"Error from server (BadRequest): container \\\"payments\\\" in pod \\\"payments-66449bf7bd-p52f8\\\" is waiting to start: CreateContainerConfigError\"], \"proposed_action\": {\"action\": \"escalate\", \"reason\": \"The secret does not exist, and creating or restoring it is a human task.\"}, \"confidence\": \"high\", \"citations\": [\"createcontainerconfigerror\"]}",
+   "text": "{\"root_cause\": \"The secret 'payments-db' does not exist in the namespace, causing the 'payments' container to fail to start.\", \"evidence\": [\"The pod 'payments-66449bf7bd-p52f8' is in 'Pending' state with a 'CreateContainerConfigError' message:'secret \\\"payments-db\\\" not found'.\", \"The container 'payments' references an environment variable 'DB_PASSWORD' from a secret 'payments-db' with key 'password', but this secret is missing.\", \"The event log confirms the secret 'payments-db' is not found.\"], \"proposed_action\": {\"action\": \"escalate\", \"target\": \"\", \"reason\": \"The missing secret 'payments-db' is likely a human error that needs to be corrected.\"}, \"confidence\": \"high\", \"citations\": [\"createcontainerconfigerror\"]}",
    "usage": {
-    "input_tokens": 2864,
-    "output_tokens": 123
+    "input_tokens": 2931,
+    "output_tokens": 190
    }
   }
  ],
- "0aa3c825e719b65d": [
+ "dfdd2cdeda5995dd": [
   {
-   "text": "{\n  \"root_cause\": \"The current revision of the 'worker' Deployment increased the cache size to 200MB, which exceeds the memory limit of 64Mi, causing the container to be killed for exceeding its memory limit.\",\n  \"evidence\": [\n    \"The pod is in a CrashLoopBackOff state with the last terminated reason being 'OOMKilled' and exit code 137.\",\n    \"The current revision of the 'worker' Deployment changed the environment variable 'CACHE_MB' from '16' to '200', which increased the cache size to 200MB.\",\n    \"The memory limit for the container is set to '64Mi', which is lower than the new cache size of 200MB.\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/worker\",\n    \"reason\": \"The current revision of the 'worker' Deployment increased the cache size to 200MB, which exceeds the memory limit of 64Mi, causing the container to be killed for exceeding its memory limit. Rolling back to the previous revision with a cache size of 16MB will restore service.\"\n  },\n  \"confidence\": \"high\",\n  \"citations\": [\"oomkilled\"]\n}",
+   "text": "{\n  \"root_cause\": \"The current revision of the Deployment increased the cache size beyond the memory limit, causing the container to be killed.\",\n  \"evidence\": [\n    \"The pod is in a CrashLoopBackOff state with the last terminated reason being 'OOMKilled' and exit code 137.\",\n    \"The current revision of the Deployment changed the environment variable 'CACHE_MB' from '16' to '200', which likely increased the memory usage beyond the limit of '64Mi'.\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/worker\",\n    \"reason\": \"The current revision increased the cache size beyond the memory limit, causing the container to be killed. Rolling back to the previous revision will restore service.\"\n  },\n  \"confidence\": \"medium\",\n  \"citations\": [\"oomkilled\"]\n}",
    "usage": {
-    "input_tokens": 3829,
-    "output_tokens": 276
+    "input_tokens": 4270,
+    "output_tokens": 191
    }
   },
   {
-   "text": "{\n  \"root_cause\": \"The current revision of the Deployment increased the cache size to 200MB, which exceeds the memory limit of 64Mi, causing the container to be killed for exceeding its memory limit.\",\n  \"evidence\": [\n    \"The pod is in CrashLoopBackOff with the last state terminated reason as OOMKilled and exit code 137.\",\n    \"The current revision of the Deployment changed the CACHE_MB environment variable from 16MB to 200MB.\",\n    \"The memory limit for the container is set to 64Mi.\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/worker\",\n    \"reason\": \"The current revision increased the cache size beyond the memory limit, causing the container to be killed. Rolling back to the previous revision with a lower cache size will restore service.\"\n  },\n  \"confidence\": \"high\",\n  \"citations\": [\"oomkilled\"]\n}",
+   "text": "{\n  \"root_cause\": \"The current revision of the 'worker' Deployment increased the cache size to 200MB, exceeding the memory limit of 64Mi, causing the container to be killed.\",\n  \"evidence\": [\n    \"The pod is in a CrashLoopBackOff state with the last terminated reason being 'OOMKilled' and exit code 137.\",\n    \"The current revision of the 'worker' Deployment changed the environment variable 'CACHE_MB' from '16' to '200', which increased the cache size to 200MB.\",\n    \"The memory limit for the container is set to '64Mi', which is lower than the new cache size of 200MB.\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/worker\",\n    \"reason\": \"The current revision increased the cache size beyond the memory limit, causing the container to be killed. Rolling back to the previous revision with a lower cache size will restore service.\"\n  },\n  \"confidence\": \"high\",\n  \"citations\": [\"oomkilled\"]\n}",
    "usage": {
-    "input_tokens": 3829,
-    "output_tokens": 211
+    "input_tokens": 4270,
+    "output_tokens": 242
    }
   },
   {
-   "text": "{\n  \"root_cause\": \"The current revision of the Deployment increased the cache size to 200MB, exceeding the memory limit of 64Mi, causing the container to be killed for exceeding its memory limit.\",\n  \"evidence\": [\n    \"The pod is in CrashLoopBackOff with the last state terminated reason: OOMKilled and exit code 137.\",\n    \"The current revision of the Deployment changed the CACHE_MB environment variable from 16MB to 200MB, which exceeds the memory limit of 64Mi.\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/worker\",\n    \"reason\": \"The problem started with the current revision, which increased the cache size beyond the memory limit, and an earlier revision exists in rollout_history.\"\n  },\n  \"confidence\": \"medium\",\n  \"citations\": [\"oomkilled\"]\n}",
+   "text": "{\n  \"root_cause\": \"The current revision of the 'worker' Deployment increased the cache size to 200MB, exceeding the memory limit of 64Mi, causing the container to be OOMKilled.\",\n  \"evidence\": [\n    \"The pod is in a CrashLoopBackOff state with the last terminated reason being 'OOMKilled' and exit code 137.\",\n    \"The current revision of the 'worker' Deployment changed the environment variable 'CACHE_MB' from '16' to '200', which increased the cache size to 200MB.\",\n    \"The memory limit for the container is set to 64Mi, which is lower than the new cache size of 200MB.\"\n  ],\n  \"proposed_action\": {\n    \"action\": \"rollback\",\n    \"target\": \"Deployment/worker\",\n    \"reason\": \"The current revision increased the cache size beyond the memory limit, causing the container to be OOMKilled. Rolling back to the previous revision with a lower cache size will restore service.\"\n  },\n  \"confidence\": \"high\",\n  \"citations\": [\"oomkilled\"]\n}",
    "usage": {
-    "input_tokens": 3829,
-    "output_tokens": 199
+    "input_tokens": 4270,
+    "output_tokens": 247
    }
   }
  ],
- "3e6fa855b51127c7": [
+ "5f96c3d4365d442f": [
   {
-   "text": "{\"root_cause\": \"The CPU request in the Deployment is set to an unrealistic value, causing the pods to be unschedulable.\", \"evidence\": [\"The Deployment's CPU request is set to '64', which is likely meant to be '64m' (millicores).\", \"The pod is stuck in the Pending state with the reason 'Insufficient cpu'.\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/reports\", \"reason\": \"The current revision introduced an oversized CPU request, and an earlier revision exists.\"}, \"confidence\": \"high\"}",
+   "text": "{\"root_cause\": \"The application fails to start because it cannot reach the database.\", \"evidence\": [\"ERROR: cannot reach database orders-db:5432: wget: can't connect to remote host (10.96.73.166): Connection refused\", \"back-off 2m40s restarting failed container=orders pod=orders-7cd4775495-zn55b_<namespace>(b696384b-c521-4aff-9c5e-5ca680cb7b46)\"], \"proposed_action\": {\"action\": \"escalate\", \"reason\": \"The database service is not available, which is causing the application to fail. A human needs to investigate and resolve the database connectivity issue.\"}, \"confidence\": \"medium\", \"citations\": [\"dependency-unreachable\"]}",
    "usage": {
-    "input_tokens": 2314,
-    "output_tokens": 130
+    "input_tokens": 4165,
+    "output_tokens": 194
    }
   },
   {
-   "text": "{\"root_cause\": \"The CPU request in the Deployment is set to an unrealistically high value.\", \"evidence\": [\"\\\"CPU request: 64\\\" is likely a mistake, as it implies 64 whole CPU cores, which is far more than any node can offer.\", \"The pod is stuck in Pending state with the reason \\\"Insufficient cpu\\\".\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/reports\", \"reason\": \"The current revision introduced an oversized CPU request. Rolling back to the previous revision will restore service.\"}, \"confidence\": \"high\"}",
+   "text": "{\"root_cause\": \"The application fails to start because it cannot reach the database.\", \"evidence\": [\"ERROR: cannot reach database orders-db:5432: wget: can't connect to remote host (10.96.73.166): Connection refused\", \"last_terminated.reason: Error\", \"last_terminated.exit_code: 1\"], \"proposed_action\": {\"action\": \"escalate\", \"reason\": \"The root cause is a dependency issue, which requires a human to investigate and resolve the database connectivity problem.\"}, \"confidence\": \"high\"}",
    "usage": {
-    "input_tokens": 2314,
+    "input_tokens": 4165,
     "output_tokens": 128
    }
   },
   {
-   "text": "{\"root_cause\": \"The CPU request in the Deployment is set to an unrealistic value, causing the pods to be unschedulable.\", \"evidence\": [\"The CPU request in the Deployment is set to '64', which is likely a mistake as it represents 64 cores, far exceeding the capacity of any node.\", \"The pod is stuck in the Pending state with the reason 'Insufficient cpu', indicating that the nodes do not have enough CPU to schedule the pod.\", \"The message from the FailedScheduling event confirms that one node is unavailable due to insufficient CPU.\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/reports\", \"reason\": \"The current revision introduced an oversized CPU request, and an earlier revision exists. Rolling back will restore service by scheduling the pods with a reasonable CPU request.\"}, \"confidence\": \"high\"}",
+   "text": "{\"root_cause\": \"The application fails to start because it cannot reach the database.\", \"evidence\": [\"ERROR: cannot reach database orders-db:5432: wget: can't connect to remote host (10.96.73.166): Connection refused\", \"last_terminated.reason: Error\", \"last_terminated.exit_code: 1\"], \"proposed_action\": {\"action\": \"escalate\", \"target\": \"\", \"reason\": \"The root cause is a dependency issue, which requires a human to investigate and resolve the database connectivity problem.\"}, \"confidence\": \"high\", \"citations\": [\"dependency-unreachable\"]}",
+   "usage": {
+    "input_tokens": 4165,
+    "output_tokens": 141
+   }
+  }
+ ],
+ "12df48d39d042ffb": [
+  {
+   "text": "{\"root_cause\": \"The application fails to start because it cannot reach the database.\", \"evidence\": [\"ERROR: cannot reach database orders-db:5432: wget: can't connect to remote host (10.96.73.166): Connection refused\", \"back-off 2m40s restarting failed container=orders pod=orders-7cd4775495-zn55b_<namespace>(b696384b-c521-4aff-9c5e-5ca680cb7b46)\"], \"proposed_action\": {\"action\": \"escalate\", \"reason\": \"The database service is not available, which is causing the application to fail. A human needs to investigate and resolve the database connectivity issue.\"}, \"confidence\": \"medium\", \"citations\": [\"crashloopbackoff\"]}",
+   "usage": {
+    "input_tokens": 4389,
+    "output_tokens": 195
+   }
+  }
+ ],
+ "4d441a7c685c4494": [
+  {
+   "text": "{\"root_cause\": \"The application fails to start because it cannot reach the database.\", \"evidence\": [\"ERROR: cannot reach database orders-db:5432: wget: can't connect to remote host (10.96.73.166): Connection refused\", \"last_terminated.reason: Error\", \"last_terminated.exit_code: 1\"], \"proposed_action\": {\"action\": \"escalate\", \"reason\": \"The root cause is a dependency issue, which requires a human to investigate and resolve the database connectivity problem.\"}, \"confidence\": \"high\", \"citations\": [\"dependency-unreachable\"]}",
+   "usage": {
+    "input_tokens": 4324,
+    "output_tokens": 137
+   }
+  }
+ ],
+ "79b08e0bcce9c509": [
+  {
+   "text": "{\"root_cause\": \"The application fails to start because it cannot reach the database.\", \"evidence\": [\"ERROR: cannot reach database orders-db:5432: wget: can't connect to remote host (10.96.73.166): Connection refused\", \"last_terminated.reason: Error\", \"last_terminated.exit_code: 1\"], \"proposed_action\": {\"action\": \"escalate\", \"target\": \"\", \"reason\": \"The root cause is a dependency issue, which requires a human to investigate and resolve the database connectivity problem.\"}, \"confidence\": \"high\"}",
+   "usage": {
+    "input_tokens": 4336,
+    "output_tokens": 132
+   }
+  }
+ ],
+ "744c47d29248147b": [
+  {
+   "text": "{\"root_cause\": \"The CPU request in the Deployment is set to 64 without the unit'm', which means it is requesting 64 cores instead of 64 millicores.\", \"evidence\": [\"The CPU request in the Deployment is set to 64 without the unit'm', which means it is requesting 64 cores instead of 64 millicores.\", \"The pod's status reason is `Evicted` (not `OOMKilled`), and the message names the resource.\", \"The pod's message: '0/2 nodes are available: 1 Insufficient cpu, 1 node(s) had untolerated taint {node-role.kubernetes.io/control-plane: }. preemption: 0/2 nodes are available: 1 No preemption victims found for incoming pod, 1 Preemption is not helpful for scheduling.'\"],\n  \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/reports\", \"reason\": \"The oversized CPU request was introduced in the current revision. Rolling back to the previous revision will restore service.\"},\n  \"confidence\": \"high\",\n  \"citations\": [\"pending-unschedulable\"]}",
    "usage": {
     "input_tokens": 2314,
-    "output_tokens": 184
+    "output_tokens": 257
+   }
+  },
+  {
+   "text": "{\"root_cause\": \"The CPU request in the Deployment is set to an unrealistic value, causing the pods to be unschedulable.\", \"evidence\": [\"The pod's CPU request is 64, which is likely a mistake as it means 64 whole cores, but the message indicates 'Insufficient cpu'.\", \"The message '0/2 nodes are available: 1 Insufficient cpu' confirms that the nodes do not have enough CPU to schedule the pod.\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/reports\", \"reason\": \"The current revision introduced an oversized CPU request, and an earlier revision exists.\"}, \"confidence\": \"high\"}",
+   "usage": {
+    "input_tokens": 2314,
+    "output_tokens": 147
+   }
+  },
+  {
+   "text": "{\"root_cause\": \"The CPU request is too large for any node to offer.\", \"evidence\": [\"\\\"CPU request is 64\\\", which is 64 cores, far larger than any node can offer.\", \"The pod's status reason is `Pending` with `Unschedulable` and `Insufficient cpu` message.\"], \"proposed_action\": {\"action\": \"escalate\", \"target\": \"\", \"reason\": \"The oversized CPU request is not something the current revision introduced, and there is no earlier revision to roll back to.\"}, \"confidence\": \"high\"}",
+   "usage": {
+    "input_tokens": 2314,
+    "output_tokens": 122
    }
   }
  ],
- "e487406d77d28c6c": [
+ "7a368063aab66c16": [
   {
-   "text": "{\"root_cause\": \"The CPU request in the Deployment is set to an unrealistic value, causing the pods to be unschedulable.\", \"evidence\": [\"The Deployment's CPU request is set to '64', which is likely meant to be '64m' (millicores).\", \"The pod is stuck in the Pending state with the reason 'Insufficient cpu'.\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/reports\", \"reason\": \"The current revision introduced an oversized CPU request, and an earlier revision exists.\"}, \"confidence\": \"high\", \"citations\": [\"pending-unschedulable\"]}",
+   "text": "{\"root_cause\": \"The CPU request in the Deployment is set to 64 without the unit'm', which means it is requesting 64 cores instead of 64 millicores.\", \"evidence\": [\"The CPU request in the Deployment is set to 64 without the unit'm', which means it is requesting 64 cores instead of 64 millicores.\", \"The pod's status reason is `Evicted` (not `OOMKilled`), and the message names the resource.\", \"The pod's message: '0/2 nodes are available: 1 Insufficient cpu, 1 node(s) had untolerated taint {node-role.kubernetes.io/control-plane: }. preemption: 0/2 nodes are available: 1 No preemption victims found for incoming pod, 1 Preemption is not helpful for scheduling.'\"],\n  \"proposed_action\": {\"action\": \"escalate\", \"target\": \"\", \"reason\": \"There is no earlier revision to roll back to. The oversized CPU request needs to be corrected by a human.\"},\n  \"confidence\": \"high\",\n  \"citations\": [\"pending-unschedulable\"]}",
    "usage": {
-    "input_tokens": 2475,
-    "output_tokens": 142
+    "input_tokens": 2609,
+    "output_tokens": 253
    }
   }
  ],
- "440b51ff9ed2f181": [
+ "82a53b1dc7840ae8": [
   {
-   "text": "{\"root_cause\": \"The CPU request in the Deployment is set to an unrealistically high value.\", \"evidence\": [\"\\\"CPU request: 64\\\" is likely a mistake, as it implies 64 whole CPU cores, which is far more than any node can offer.\", \"The pod is stuck in Pending state with the reason \\\"Insufficient cpu\\\".\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/reports\", \"reason\": \"The current revision introduced an oversized CPU request. Rolling back to the previous revision will restore service.\"}, \"confidence\": \"high\", \"citations\": [\"pending-unschedulable\"]}",
+   "text": "{\"root_cause\": \"The CPU request in the Deployment is set to an unrealistic value, causing the pods to be unschedulable.\", \"evidence\": [\"The pod's CPU request is 64, which is likely a mistake as it means 64 whole cores, but the message indicates 'Insufficient cpu'.\", \"The message '0/2 nodes are available: 1 Insufficient cpu' confirms that the nodes do not have enough CPU to schedule the pod.\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/reports\", \"reason\": \"The current revision introduced an oversized CPU request, and an earlier revision exists.\"}, \"confidence\": \"high\", \"citations\": [\"pending-unschedulable\"]}",
    "usage": {
-    "input_tokens": 2473,
-    "output_tokens": 140
+    "input_tokens": 2492,
+    "output_tokens": 159
    }
   }
  ],
- "c16e182b8c82ab0b": [
+ "b1f23cdd3d65d3c7": [
   {
-   "text": "{\"root_cause\": \"The CPU request in the Deployment is set to an unrealistic value, causing the pods to be unschedulable.\", \"evidence\": [\"The CPU request in the Deployment is set to '64', which is likely a mistake as it represents 64 cores, far exceeding the capacity of any node.\", \"The pod is stuck in the Pending state with the reason 'Insufficient cpu', indicating that the nodes do not have enough CPU to schedule the pod.\", \"The message from the FailedScheduling event confirms that one node is unavailable due to insufficient CPU.\"], \"proposed_action\": {\"action\": \"rollback\", \"target\": \"Deployment/reports\", \"reason\": \"The current revision introduced an oversized CPU request, and an earlier revision exists. Rolling back will restore service by scheduling the pods with a reasonable CPU request.\"}, \"confidence\": \"high\", \"citations\": [\"pending-unschedulable\"]}",
+   "text": "{\"root_cause\": \"The CPU request is too large for any node to offer.\", \"evidence\": [\"\\\"CPU request is 64\\\", which is 64 cores, far larger than any node can offer.\", \"The pod's status reason is `Pending` with `Unschedulable` and `Insufficient cpu` message.\"], \"proposed_action\": {\"action\": \"escalate\", \"target\": \"\", \"reason\": \"The oversized CPU request is not something the current revision introduced, and there is no earlier revision to roll back to.\"}, \"confidence\": \"high\", \"citations\": [\"pending-unschedulable\"]}",
    "usage": {
-    "input_tokens": 2529,
-    "output_tokens": 196
+    "input_tokens": 2467,
+    "output_tokens": 134
    }
   }
  ]

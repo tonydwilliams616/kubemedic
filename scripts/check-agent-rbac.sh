@@ -30,6 +30,8 @@ check yes list  events
 check yes get   deployments.apps
 check yes list  replicasets.apps
 check yes get   configmaps
+check yes list  services
+check yes list  endpointslices.discovery.k8s.io
 
 echo "Denied: secrets, writes, exec"
 check no  get    secrets
@@ -39,6 +41,8 @@ check no  create pods:exec
 check no  patch  deployments.apps
 check no  update deployments.apps:scale
 check no  create configmaps
+check no  patch  services
+check no  delete services
 check no  delete namespaces
 
 echo "Denied: anything outside scenario namespaces"

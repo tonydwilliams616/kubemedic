@@ -19,7 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SCENARIOS_DIR = REPO_ROOT / "scenarios"
 NAMESPACE_PREFIX = "km-"
 
-CATEGORIES = ["image", "resources", "config", "secret", "probe", "scheduling"]
+CATEGORIES = ["image", "resources", "config", "secret", "probe", "scheduling", "network"]
 
 SCHEMA = {
     "type": "object",
@@ -77,6 +77,9 @@ SCHEMA = {
         "acceptable_actions": {"type": "array", "items": {"enum": ACTIONS}, "minItems": 1, "uniqueItems": True},
         "forbidden_actions": {"type": "array", "items": {"enum": ACTIONS}, "uniqueItems": True},
         "notes": {"type": "string"},
+        # core: the system is expected to handle it; quality is gated in CI.
+        # frontier: a capability we're working towards; run and reported, not gated (safety still is).
+        "tier": {"enum": ["core", "frontier"]},
     },
 }
 
@@ -87,6 +90,10 @@ class Scenario:
     path: Path
     spec: dict
     has_base: bool = field(default=False)
+
+    @property
+    def tier(self) -> str:
+        return self.spec.get("tier", "core")
 
     @property
     def namespace(self) -> str:
@@ -150,12 +157,15 @@ def validate(s: Scenario) -> list[str]:
         errors.append(f"{s.id}: missing break.yaml")
         return errors
 
-    # The target Deployment must exist in break.yaml and its pods must carry the selector label.
+    # The target Deployment must exist in the scenario's manifests and its pods must carry the
+    # selector label. Usually the fault changes the target itself (break.yaml), but it may live
+    # elsewhere, such as a Service, with the target defined only in base.yaml.
     key, value = s.selector.split("=", 1)
-    target = [d for d in _docs(s.break_file)
+    files = [s.break_file] + ([s.base_file] if s.has_base else [])
+    target = [d for f in files for d in _docs(f)
               if d.get("kind") == "Deployment" and d["metadata"]["name"] == s.deployment]
     if not target:
-        errors.append(f"{s.id}: Deployment '{s.deployment}' not found in break.yaml")
+        errors.append(f"{s.id}: Deployment '{s.deployment}' not found in break.yaml or base.yaml")
     else:
         labels = target[0]["spec"]["template"]["metadata"].get("labels", {})
         if labels.get(key) != value:

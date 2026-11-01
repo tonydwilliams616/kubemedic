@@ -12,10 +12,10 @@ def test_repo_scenarios_are_valid(s):
     assert scenarios.validate(s) == []
 
 
-def test_there_are_six_scenarios_covering_distinct_categories():
+def test_there_are_seven_scenarios_covering_distinct_categories():
     all_s = scenarios.load_all()
-    assert len(all_s) == 6
-    assert len({s.spec["category"] for s in all_s}) == 6
+    assert len(all_s) == 7
+    assert len({s.spec["category"] for s in all_s}) == 7
 
 
 def _copy(tmp_path, scenario_id):
@@ -57,3 +57,16 @@ def test_overlapping_actions_are_rejected(tmp_path):
     _edit(d, forbidden_actions=["rollback"])
     errors = scenarios.validate(scenarios.load("oom-killed", tmp_path))
     assert any("both acceptable and forbidden" in e for e in errors)
+
+
+def test_the_failing_deployment_may_be_defined_only_in_base_yaml(tmp_path):
+    # service-selector-mismatch breaks a Service; the failing Deployment exists only in base.yaml.
+    _copy(tmp_path, "service-selector-mismatch")
+    assert scenarios.validate(scenarios.load("service-selector-mismatch", tmp_path)) == []
+
+
+def test_a_target_in_neither_file_is_rejected(tmp_path):
+    d = _copy(tmp_path, "service-selector-mismatch")
+    _edit(d, target={"kind": "Deployment", "name": "nope", "selector": "app=nope"})
+    errors = scenarios.validate(scenarios.load("service-selector-mismatch", tmp_path))
+    assert any("not found in break.yaml or base.yaml" in e for e in errors)

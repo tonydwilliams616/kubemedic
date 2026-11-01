@@ -37,7 +37,8 @@ from .tools import Toolbox, bedrock_spec
 
 # Bump on any change to the agent's prompt or task. a1: first agent.
 # a2: step counter, forced final answer, repeated calls not re-run, no logs for pods that never ran.
-AGENT_PROMPT_VERSION = "a2"
+# a3: a2 plus the list_services tool (the prompt is unchanged; the tool set is part of the version).
+AGENT_PROMPT_VERSION = "a3"
 MAX_STEPS = 12
 MAX_INPUT_TOKENS = 200_000    # each step resends the whole conversation, so input grows every step
 SUBMIT = "submit_diagnosis"

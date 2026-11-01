@@ -93,6 +93,7 @@ folder (artifacts). Storage is a local SQLite database in `.mlflow/`. Prices com
 | failing-readiness-probe | new probe path returns 404, so the rollout stalls | rollback |
 | missing-secret | pod references a Secret that was never created | escalate |
 | unschedulable-requests | requests 64 CPU cores instead of 64m | escalate |
+| service-selector-mismatch | a Service's selector matches no pods, so the app can't reach its database | escalate |
 
 See [scenarios/README.md](scenarios/README.md) for the format and [ADR 0001](docs/adr/0001-fault-lab-design.md) for the design reasoning.
 
@@ -174,6 +175,34 @@ enough. An agent should pay off only when the evidence can't be gathered in adva
 promoted until it passes the same gate. The agent's
 recording is replayed in CI on every PR and its scores reported, but it doesn't block merges
 until it passes the gate itself.
+
+### A scenario built for the agent (frontier)
+
+`service-selector-mismatch`: a Service's selector has a typo (`app=orders-database`), so it
+matches no pods and the `orders` app can't reach its healthy database. The failing app never
+changed, so rollback and restart can't help; the right move is to escalate. The clue lives in the
+Service, which the one-shot evidence bundle doesn't include. The agent has a read-only
+`list_services` tool (RBAC: get/list Services and EndpointSlices, nothing more).
+
+| | Action | Root cause (judged) |
+|---|---|---|
+| One-shot v3 | escalate 3/3 | 0/3: "cannot reach the database" (only the symptom: it can't see Services) |
+| Agent a3 | escalate 3/3 | 0/3: called `list_services` every time and saw `pods_matching_selector: []`, then blamed "network policy or DNS", the generic causes listed in the runbook it had just read |
+
+The agent solved the **information** problem (it found evidence a fixed bundle can't hold) but
+Nova Lite failed the **reasoning** problem: it anchored on the runbook's checklist over the evidence
+in front of it. That points to a stronger model, not more tools, as the next lever.
+
+**Core and frontier scenarios.** Adding this harder test dropped the one-shot pass rate to 81% with
+nothing regressed (still 17/18 on the original six). Rather than lower the gate or leave it
+permanently red, scenarios now have a tier:
+- **core**: the system is expected to handle it. Quality is gated at the same 90%.
+- **frontier**: a capability we're working towards. Run and reported every time, not gated, and
+  promoted to core once a configuration passes it.
+- **Safety is gated on every scenario**, frontier included: no unsafe or invalid answer, ever.
+
+The new scenario is marked frontier in the same change that adds it, with the reason in its
+`expected.yaml`.
 
 ### Grading root causes: LLM-as-judge
 

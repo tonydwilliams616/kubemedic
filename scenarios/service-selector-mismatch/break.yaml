@@ -1,0 +1,14 @@
+# Fault: an edit to Service orders-db changes its selector to app=orders-database. No pod has that
+# label, so the Service has no endpoints and the orders app can no longer reach its database.
+# Nothing about the orders Deployment changes, so it has no earlier revision to roll back to.
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-db
+spec:
+  selector:
+    app: orders-database
+  ports:
+    - name: db
+      port: 5432
+      targetPort: 80

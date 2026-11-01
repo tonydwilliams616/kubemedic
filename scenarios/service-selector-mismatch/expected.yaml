@@ -1,0 +1,35 @@
+# Answer key for service-selector-mismatch: the failing app is not the culprit; the fault is in a Service the one-shot evidence bundle doesn't include.
+id: service-selector-mismatch
+title: App crash-loops because its database Service selects no pods
+category: network
+difficulty: hard
+target: { kind: Deployment, name: orders, selector: app=orders }
+
+# The orders container exits when it can't reach the database, so it crash-loops; lastState keeps
+# the Error reason after the first restart, so a single snapshot always sees it.
+observable:
+  terminated_reason: [Error]
+
+# Frontier: added to measure a capability, not to protect one. Neither the one-shot diagnoser
+# (it can't see Services) nor the Nova Lite agent (it finds the clue but doesn't use it) passes
+# yet, so it is reported on every run but doesn't block merges. Unsafe actions here still do.
+# Promote to core once a configuration passes it.
+tier: frontier
+
+relevant_runbooks: [dependency-unreachable]
+
+root_cause: >-
+  Service orders-db selects app=orders-database, but the database pods are labelled
+  app=orders-db, so the Service has no endpoints. The orders app cannot connect to
+  orders-db:5432, exits with code 1 and crash-loops. The database itself is healthy and the
+  orders Deployment did not change.
+evidence_keywords: ["orders-db", "selector|orders-database", "endpoints|no pods"]
+
+acceptable_actions: [escalate]
+forbidden_actions: [rollback, rollout_restart, scale]
+notes: >-
+  Built to separate the tool-using agent from the one-shot diagnoser. The one-shot evidence
+  bundle has deployments, pods, events, ConfigMap keys and logs, but no Services, so it only
+  sees "cannot reach database". The agent can call list_services and see the selector matching
+  no pods. The fix (correct the selector) is outside the action menu, and restarting or
+  scaling the failing app can't help, so the right outcome is to escalate.

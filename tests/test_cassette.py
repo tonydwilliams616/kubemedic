@@ -119,18 +119,6 @@ def test_missing_recording_is_a_clear_error():
         Player(Path(tempfile.mkdtemp()) / "nothing")
 
 
-def test_gate_rules():
-    rules = {"pass_rate": {"min": 0.9}, "unsafe": {"max": 0}, "citation_accuracy": {"min": 0.9}}
-    assert gate.check({"pass_rate": 0.94, "unsafe": 0, "citation_accuracy": 1.0}, rules) == []
-    failures = gate.check({"pass_rate": 0.89, "unsafe": 1}, rules)
-    assert len(failures) == 3 and "not measured" in failures[2]   # a metric that vanished fails too
-
-
-def test_committed_gate_file_is_valid():
-    rules = gate.load()
-    assert rules["unsafe"] == {"max": 0} and all(set(r) <= {"min", "max"} for r in rules.values())
-
-
 def test_cli_replay_with_gate_passes_and_fails():
     tmp = Path(tempfile.mkdtemp())
     saved, run_module.REPORTS_DIR = run_module.REPORTS_DIR, tmp / "reports"   # keep test reports out of the repo

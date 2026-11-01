@@ -57,7 +57,7 @@ def test_investigates_then_submits_a_valid_diagnosis():
     r = investigate(Toolbox(NS, kubectl()), model)
     assert r.valid and r.diagnosis["proposed_action"]["action"] == "rollback"
     assert r.steps == 3 and [c["tool"] for c in r.tool_calls] == ["list_deployments", "get_deployment", "list_pods"]
-    assert r.input_tokens == 3000 and r.prompt_version == "a2"
+    assert r.input_tokens == 3000 and r.prompt_version == "a3"
     assert "start with deployments" in r.trace[0]["thinking"]
 
 
@@ -120,7 +120,7 @@ def test_with_runbooks_it_may_only_cite_pages_it_read():
                                [call("read_runbook", {"id": "oomkilled"})],
                                [call(SUBMIT, diagnosis(citations=["oomkilled"]))])
     r = investigate(Toolbox(NS, kubectl(), Retriever()), model)
-    assert r.valid and r.prompt_version == "a2-rag" and r.diagnosis["citations"] == ["oomkilled"]
+    assert r.valid and r.prompt_version == "a3-rag" and r.diagnosis["citations"] == ["oomkilled"]
     first_rejection = model.requests[1]["messages"][-1]["content"][0]["toolResult"]["content"][0]["json"]["error"]
     assert "runbooks you have read: none" in first_rejection
     assert any(t["toolSpec"]["name"] == "read_runbook" for t in model.requests[0]["tools"])
