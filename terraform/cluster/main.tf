@@ -94,4 +94,10 @@ module "eks" {
   node_security_group_tags = {
     "karpenter.sh/discovery" = var.cluster_name
   }
+
+  # Order matters both ways. Up: the internet gateway route must exist before nodes start, or
+  # they can't reach the internet to join the cluster. Down: nodes (and their public IPs) must be
+  # gone before the internet gateway can be detached; without this Terraform deletes both at once
+  # and the gateway sits retrying until the node group has finished deleting.
+  depends_on = [module.vpc]
 }
