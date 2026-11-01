@@ -23,6 +23,10 @@ Two ways in, and only two:
   cluster state RIGHT NOW (if anything changed since the human approved, it refuses), and it writes
   the audit record itself, so a change can't happen without being logged.
 
+Then verify(plan, audit): "accepted" isn't "fixed". It polls the Deployment until the rollout has
+finished and every replica is updated and available, or a timeout passes, and audits the result.
+A fix that didn't work is reported and handed back to a human: no automatic second attempt.
+
 Usage: python -m kubemedic.executor --namespace km-bad-image-tag --action rollback --target Deployment/web
 """
 from __future__ import annotations
@@ -32,7 +36,9 @@ import hashlib
 import json
 import re
 import sys
+import time
 from dataclasses import dataclass, field
+from typing import Callable
 
 from . import guardrails
 from .evidence import AgentKubectl, summarise_deployment
@@ -71,6 +77,14 @@ class Outcome:
     fingerprint: str = ""          # the cluster state this outcome was based on (see fingerprint())
 
 
+@dataclass
+class Verification:
+    healthy: bool
+    waited_s: float
+    status: dict                   # the Deployment's replica counts when we stopped looking
+    detail: str
+
+
 @dataclass(frozen=True)
 class Approval:
     """A human's yes to ONE plan in ONE cluster state. It can't be reused for anything else."""
@@ -97,8 +111,12 @@ def plan(proposal: dict, namespace: str) -> Plan:
 
 
 class Executor:
-    def __init__(self, context: str = "kind-kubemedic", kubectl: AgentKubectl | None = None):
+    def __init__(self, context: str = "kind-kubemedic", kubectl: AgentKubectl | None = None,
+                 verify_timeout_s: float = 120, poll_s: float = 3,
+                 clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep):
         self.k = kubectl or ExecutorKubectl(context)   # tests pass a fake, so no cluster is needed
+        # How verify() waits; tests pass a fake clock and sleep so nothing really waits.
+        self.verify_timeout_s, self.poll_s, self.clock, self.sleep = verify_timeout_s, poll_s, clock, sleep
 
     def live_deployment(self, p: Plan) -> dict | None:
         """The target as it is NOW, read with the executor's own identity."""
@@ -149,6 +167,41 @@ class Executor:
                      ok=ok, output=out.strip()[:500])
         return Outcome(p, ok=ok, changed=ok, summary=summary, output=out.strip(), fingerprint=state,
                        refused=[] if ok else [f"kubectl failed: {out.strip()}"])
+
+
+    def verify(self, p: Plan, audit) -> Verification:
+        """Wait until the change has actually taken effect, then audit what was seen.
+
+        Polls with `get` (the executor has no watch permission and can't see pods): the rollout is
+        done when the controller has seen the new spec, every replica runs it and is available,
+        and no old pods are left.
+        """
+        started = self.clock()
+        while True:
+            healthy, status = rollout_done(self.k.get(p.namespace, "deployment", p.deployment))
+            waited = round(self.clock() - started, 1)
+            if healthy or waited >= self.verify_timeout_s:
+                break
+            self.sleep(self.poll_s)
+        detail = (f"{status.get('available', 0)}/{status.get('desired')} available, {status.get('updated', 0)} updated, "
+                  f"{status.get('replicas', 0)} total")
+        audit.append("verified" if healthy else "verification_failed", namespace=p.namespace, action=p.action,
+                     deployment=p.deployment, waited_s=waited, status=status)
+        return Verification(healthy, waited, status, detail)
+
+
+def rollout_done(dep: dict | None) -> tuple[bool, dict]:
+    """Has the rollout finished with every replica updated and available? (What `kubectl rollout status` checks.)"""
+    if dep is None:
+        return False, {"error": "Deployment not found"}
+    spec, status = dep.get("spec", {}), dep.get("status", {})
+    s = {"desired": spec.get("replicas", 1), "replicas": status.get("replicas", 0),
+         "updated": status.get("updatedReplicas", 0), "available": status.get("availableReplicas", 0),
+         "generation": dep["metadata"].get("generation"), "observed": status.get("observedGeneration")}
+    seen_new_spec = s["observed"] is None or s["generation"] is None or s["observed"] >= s["generation"]
+    done = (seen_new_spec and s["updated"] >= s["desired"] and s["replicas"] == s["updated"]
+            and s["available"] >= s["desired"])
+    return done, s
 
 
 def fingerprint(p: Plan, dep: dict) -> str:

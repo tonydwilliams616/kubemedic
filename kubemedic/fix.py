@@ -9,6 +9,7 @@ The only path to a change in the cluster:
                    (typing the name, not pressing y, stops reflexive approvals)
   5. apply         the executor re-checks the live cluster; if it changed since the
                    human approved, it refuses; otherwise it acts                    -> "executed" / "refused_at_apply"
+  6. verify        wait for the rollout to finish healthy, or report that it didn't -> "verified" / "verification_failed"
 
 There is no flag to skip step 4, and approval needs a person at a terminal: a script, CI job or
 pipe can't approve anything.
@@ -85,7 +86,13 @@ def run_fix(namespace: str, diagnose_fn: Callable[[str], object], executor: Exec
     if not done.ok:
         out(f"NOT APPLIED: {'; '.join(done.refused)}")
         return 1
-    out(f"APPLIED: {done.output}")
+    out(f"APPLIED: {done.output}. Checking it worked...")
+    check = executor.verify(p, audit)
+    if not check.healthy:
+        out(f"NOT FIXED after {check.waited_s}s: {check.detail}. Nothing more will be changed automatically; "
+            "this needs a human.")
+        return 1
+    out(f"VERIFIED: {check.detail} after {check.waited_s}s.")
     return 0
 
 
