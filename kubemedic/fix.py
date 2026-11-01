@@ -165,6 +165,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Model server error ({args.model}): {e}", file=sys.stderr)
         return 2
     print(f"\naudit log: {audit.path} (check it with: make audit-verify)")
+    from .metrics import publish_audit
+    publish_audit(audit.path)          # no-op unless KUBEMEDIC_PUSHGATEWAY is set; never fails the fix
     return code
 
 

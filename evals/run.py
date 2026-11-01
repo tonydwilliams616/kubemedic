@@ -376,7 +376,7 @@ def _agent_runner(model, kubectl, retriever, tape=None) -> Callable[[str], objec
 
 
 def _track(summary: dict, out_dir: Path, extra: dict | None) -> None:
-    """Log the run to MLflow; a tracking problem must never fail an eval that already ran."""
+    """Log the run to MLflow and push it to Prometheus; neither may fail an eval that already ran."""
     from .tracking import log_eval
     try:
         run_id = log_eval(summary, out_dir, extra)
@@ -384,6 +384,20 @@ def _track(summary: dict, out_dir: Path, extra: dict | None) -> None:
             print(f"tracked in MLflow: run {run_id} (make mlflow-ui)")
     except Exception as e:  # noqa: BLE001
         print(f"warning: MLflow tracking failed: {e}", file=sys.stderr)
+    try:
+        if push_eval(summary):
+            print("metrics pushed to Prometheus (make grafana)")
+    except Exception as e:  # noqa: BLE001
+        print(f"warning: metrics push failed: {e}", file=sys.stderr)
+
+
+def push_eval(summary: dict, url: str | None = None) -> bool:
+    """The same numbers MLflow records, as Prometheus gauges for this model/mode/rag combination."""
+    from kubemedic.metrics import from_numbers, push, run_labels
+
+    from .tracking import diagnosis_record, load_pricing
+    _, numbers = diagnosis_record(summary, load_pricing())
+    return push("kubemedic_eval", run_labels(summary), from_numbers("kubemedic_eval", numbers), url=url)
 
 
 if __name__ == "__main__":
