@@ -1,0 +1,9 @@
+# Prometheus scrape config: one target, the Pushgateway, where kubemedic leaves its results.
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: pushgateway
+    # Keep the job/model/mode labels kubemedic pushed, instead of overwriting job with "pushgateway"
+    honor_labels: true
+    static_configs:
+      - targets: ["pushgateway:9091"]

@@ -1,0 +1,10 @@
+# Tells Grafana to load every dashboard JSON in /var/lib/grafana/dashboards (the kubemedic dashboard ConfigMap).
+apiVersion: 1
+providers:
+  - name: kubemedic
+    folder: kubemedic
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

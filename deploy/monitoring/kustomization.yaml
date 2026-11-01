@@ -1,0 +1,16 @@
+# Assembles the monitoring stack for the kind lab (Prometheus, Pushgateway, Grafana) and turns the files in config/ into ConfigMaps: `kubectl apply -k deploy/monitoring`.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+resources:
+  - namespace.yaml
+  - pushgateway.yaml
+  - prometheus.yaml
+  - grafana.yaml
+configMapGenerator:
+  - name: prometheus-config
+    files: [config/prometheus.yml]
+  - name: grafana-provisioning
+    files: [config/datasource.yaml, config/dashboards.yaml]
+  - name: grafana-dashboards
+    files: [config/kubemedic.json]

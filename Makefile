@@ -18,7 +18,7 @@ EKS_REGION  := us-east-1
 EKS_CONTEXT := kubemedic-eks
 SELF_HOSTED := openai:Qwen/Qwen3-8B
 
-.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose investigate dry-run fix audit-verify eval-fixrate eval eval-retrieval record record-agent eval-replay judge-label judge-calibrate judge-cache tracking-setup mlflow-ui track-reports validate test lint tf-bootstrap eks-up eks-down gpu-test model-up model-forward model-down compare aws-running tf-check
+.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose investigate dry-run fix audit-verify eval-fixrate eval eval-retrieval record record-agent eval-replay judge-label judge-calibrate judge-cache tracking-setup mlflow-ui track-reports validate test lint tf-bootstrap eks-up eks-down gpu-test model-up model-forward model-down compare monitoring-up monitoring-forward monitoring-down grafana-password aws-running tf-check
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
@@ -131,6 +131,7 @@ validate: ## Validate scenario definitions (and manifests, if kubeconform is ins
 	$(PYTHON) -m lab validate
 	@if command -v kubeconform >/dev/null; then \
 		kubeconform -strict -summary -ignore-filename-pattern 'expected.yaml' \
+			-ignore-filename-pattern 'kustomization.yaml' -ignore-filename-pattern 'deploy/monitoring/config/' \
 			-schema-location default \
 			-schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
 			scenarios/ deploy/; \
@@ -140,6 +141,29 @@ test: ## Run unit tests
 	$(PYTHON) -m pytest -q
 
 lint: validate test ## Everything CI runs before touching a cluster
+
+# ---- Monitoring (Phase 7): Prometheus, Pushgateway and Grafana on the kind lab ----
+
+monitoring-up: ## Start Prometheus, Pushgateway and Grafana on kind (~0.5 GB memory) with the kubemedic dashboard
+	kubectl --context $(CONTEXT) create namespace monitoring --dry-run=client -o yaml | kubectl --context $(CONTEXT) apply -f - && \
+	{ kubectl --context $(CONTEXT) -n monitoring get secret grafana-admin >/dev/null 2>&1 || \
+	  kubectl --context $(CONTEXT) -n monitoring create secret generic grafana-admin --from-literal=password=$$(openssl rand -hex 16); } && \
+	kubectl --context $(CONTEXT) apply -k deploy/monitoring && \
+	kubectl --context $(CONTEXT) -n monitoring scale deployment --all --replicas=1 && \
+	for d in pushgateway prometheus grafana; do kubectl --context $(CONTEXT) -n monitoring rollout status deployment/$$d --timeout=5m || exit 1; done && \
+	echo "Next: make monitoring-forward (own terminal), then in the terminal you run evals in: export KUBEMEDIC_PUSHGATEWAY=http://localhost:9091"
+
+monitoring-forward: ## Grafana at http://localhost:3000 and the Pushgateway at http://localhost:9091 (leave running; Ctrl-C stops both)
+	@kubectl --context $(CONTEXT) -n monitoring port-forward service/pushgateway 9091:9091 >/dev/null & pf=$$!; \
+	trap "kill $$pf 2>/dev/null" EXIT INT TERM; \
+	echo "Grafana: http://localhost:3000   Pushgateway: http://localhost:9091   (Ctrl-C to stop)"; \
+	kubectl --context $(CONTEXT) -n monitoring port-forward service/grafana 3000:3000 >/dev/null
+
+monitoring-down: ## Stop the monitoring stack to free memory; history is kept for the next monitoring-up
+	kubectl --context $(CONTEXT) -n monitoring scale deployment --all --replicas=0
+
+grafana-password: ## Print Grafana's admin password (viewing needs no login; editing does)
+	@kubectl --context $(CONTEXT) -n monitoring get secret grafana-admin -o jsonpath='{.data.password}' | base64 -d; echo
 
 # ---- AWS (Phase 6): a short-lived EKS cluster for the self-hosted model. Run `source ./aws-login.sh` first. ----
 
