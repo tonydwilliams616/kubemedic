@@ -38,8 +38,10 @@ spec:
           readinessProbe:
             httpGet: {path: /api/health, port: http}
           resources:
-            requests: {cpu: 50m, memory: 128Mi}
-            limits: {memory: 256Mi}
+            # Grafana 13 needs more than 256Mi while it starts up (database migrations, plugin
+            # loading): at 256Mi it was OOM-killed every few seconds, which also dropped the port-forward
+            requests: {cpu: 50m, memory: 256Mi}
+            limits: {memory: 512Mi}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities: {drop: [ALL]}
