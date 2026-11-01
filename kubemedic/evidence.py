@@ -193,11 +193,14 @@ def configmap_keys(cm: dict) -> dict:
 # ---------- gatherers: run kubectl as the agent ----------
 
 class AgentKubectl:
+    """Runs kubectl as one ServiceAccount (impersonation), so only that identity's RBAC applies."""
+    user = AGENT_USER
+
     def __init__(self, context: str):
         self.context = context
 
     def run(self, *args: str) -> tuple[bool, str]:
-        cmd = ["kubectl", "--context", self.context, "--as", AGENT_USER, *args]
+        cmd = ["kubectl", "--context", self.context, "--as", self.user, *args]
         proc = subprocess.run(cmd, capture_output=True, text=True)
         return proc.returncode == 0, proc.stdout if proc.returncode == 0 else proc.stderr.strip()
 

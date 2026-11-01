@@ -13,7 +13,7 @@ AGENT_RECORDING ?= evals/recordings/nova-lite-agent-rag
 AGENT    ?=
 LAB      := $(PYTHON) -m lab --context $(CONTEXT)
 
-.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose investigate eval eval-retrieval record record-agent eval-replay judge-label judge-calibrate judge-cache tracking-setup mlflow-ui track-reports validate test lint
+.PHONY: help cluster-up cluster-down list break check reset break-all check-all reset-all agent-rbac rbac-check evidence search diagnose investigate dry-run eval eval-retrieval record record-agent eval-replay judge-label judge-calibrate judge-cache tracking-setup mlflow-ui track-reports validate test lint
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
@@ -48,10 +48,10 @@ check-all: ## Assert every fault is observable
 reset-all: ## Remove every scenario
 	$(LAB) reset --all
 
-agent-rbac: ## Install the agent's read-only identity (ServiceAccount + ClusterRole)
-	kubectl --context $(CONTEXT) apply -f deploy/agent/rbac.yaml
+agent-rbac: ## Install both identities: the agent's read-only one and the executor's narrow one
+	kubectl --context $(CONTEXT) apply -f deploy/agent/rbac.yaml -f deploy/executor/rbac.yaml
 
-rbac-check: ## Prove the agent can read scenarios but not Secrets, writes or other namespaces
+rbac-check: ## Prove the agent can only read, and the executor can only restart or roll back, in scenario namespaces
 	CONTEXT=$(CONTEXT) ./scripts/check-agent-rbac.sh
 
 evidence: ## Print the agent's evidence bundle for a scenario: make evidence SCENARIO=oom-killed
@@ -69,6 +69,10 @@ diagnose: ## Ask the LLM to diagnose a scenario: make diagnose SCENARIO=oom-kill
 investigate: ## Let the tool-using agent investigate a scenario step by step: make investigate SCENARIO=oom-killed [MODEL=<id>] [RAG=1]
 	@test -n "$(SCENARIO)" || (echo "SCENARIO is required" && exit 1)
 	$(PYTHON) -m kubemedic.agent --namespace km-$(SCENARIO) --context $(CONTEXT) $(if $(MODEL),--model $(MODEL)) $(if $(RAG),--rag)
+
+dry-run: ## Dry-run one fix as the executor (nothing changes): make dry-run SCENARIO=bad-image-tag ACTION=rollback TARGET=Deployment/web
+	@test -n "$(SCENARIO)" -a -n "$(ACTION)" || (echo "SCENARIO and ACTION are required" && exit 1)
+	$(PYTHON) -m kubemedic.executor --namespace km-$(SCENARIO) --context $(CONTEXT) --action $(ACTION) $(if $(TARGET),--target $(TARGET))
 
 eval: ## Score the diagnoser (or the agent) on every broken scenario: make eval [MODEL=<id>] [REPEATS=3] [RAG=1] [AGENT=1]
 	$(PYTHON) -m evals.run --context $(CONTEXT) --repeats $(REPEATS) $(if $(MODEL),--model $(MODEL)) $(if $(RAG),--rag) $(if $(AGENT),--agent)
