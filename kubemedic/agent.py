@@ -222,13 +222,13 @@ def print_trace(result: Result) -> None:
 def main(argv: list[str] | None = None) -> int:
     from botocore.exceptions import BotoCoreError, ClientError
 
-    from .diagnose import BedrockModel
     from .evidence import AgentKubectl
+    from .models import ModelServerError, make_model
 
-    p = argparse.ArgumentParser(description="Investigate one namespace with a tool-using agent on Bedrock")
+    p = argparse.ArgumentParser(description="Investigate one namespace with a tool-using agent (Bedrock or self-hosted model)")
     p.add_argument("--namespace", "-n", required=True)
     p.add_argument("--context", default="kind-kubemedic")
-    p.add_argument("--model", default=DEFAULT_MODEL)
+    p.add_argument("--model", default=DEFAULT_MODEL, help="a Bedrock model ID, or openai:<name> for a self-hosted model (see kubemedic/models.py)")
     p.add_argument("--rag", action="store_true", help="give the agent the runbook search and read tools")
     p.add_argument("--json", action="store_true", help="print the full result as JSON instead of the trace")
     args = p.parse_args(argv)
@@ -239,12 +239,15 @@ def main(argv: list[str] | None = None) -> int:
             from .retrieve import Retriever
             retriever = Retriever()
         toolbox = Toolbox(args.namespace, AgentKubectl(args.context), retriever)
-        result = investigate(toolbox, BedrockModel(args.model))
+        result = investigate(toolbox, make_model(args.model))
     except BotoCoreError as e:
         print(f"AWS credentials problem: {e}\nFix: source ./aws-login.sh", file=sys.stderr)
         return 2
     except ClientError as e:
         print(f"Bedrock error ({args.model}): {e.response['Error']['Message']}", file=sys.stderr)
+        return 2
+    except ModelServerError as e:
+        print(f"Model server error ({args.model}): {e}", file=sys.stderr)
         return 2
 
     if args.json:

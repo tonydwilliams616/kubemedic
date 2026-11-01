@@ -135,12 +135,13 @@ def make_diagnose_fn(context: str, model, rag: bool, agent: bool) -> Callable[[s
 def main(argv: list[str] | None = None) -> int:
     from botocore.exceptions import BotoCoreError, ClientError
 
-    from .diagnose import DEFAULT_MODEL, BedrockModel
+    from .diagnose import DEFAULT_MODEL
+    from .models import ModelServerError, make_model
 
     p = argparse.ArgumentParser(description="Diagnose, propose, and (only with your typed approval) fix a namespace")
     p.add_argument("--namespace", "-n", required=True)
     p.add_argument("--context", default="kind-kubemedic")
-    p.add_argument("--model", default=DEFAULT_MODEL)
+    p.add_argument("--model", default=DEFAULT_MODEL, help="a Bedrock model ID, or openai:<name> for a self-hosted model (see kubemedic/models.py)")
     p.add_argument("--agent", action="store_true", help="diagnose with the tool-using agent instead of one-shot")
     p.add_argument("--rag", action="store_true", help="use the runbooks")
     args = p.parse_args(argv)
@@ -150,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return 2
 
-    diagnose_fn = make_diagnose_fn(args.context, BedrockModel(args.model), args.rag, args.agent)
+    diagnose_fn = make_diagnose_fn(args.context, make_model(args.model), args.rag, args.agent)
     audit = AuditLog()
     try:
         code = run_fix(args.namespace, diagnose_fn, Executor(args.context), audit)
@@ -159,6 +160,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     except ClientError as e:
         print(f"Bedrock error ({args.model}): {e.response['Error']['Message']}", file=sys.stderr)
+        return 2
+    except ModelServerError as e:
+        print(f"Model server error ({args.model}): {e}", file=sys.stderr)
         return 2
     print(f"\naudit log: {audit.path} (check it with: make audit-verify)")
     return code
