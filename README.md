@@ -1,23 +1,68 @@
 # kubemedic
 
-An AI agent that diagnoses Kubernetes failures, retrieves the relevant runbook, and proposes a fix from a small allowlist of actions. A human approves every change, and every step is audited.
+An AI agent that diagnoses Kubernetes failures, finds the relevant runbook, and proposes one fix
+from a small allowlist. A separate identity applies the fix only after a human types their
+approval, checks that it worked, and records every step in a tamper-evident audit log. Every
+claim below comes from an evaluation harness that breaks a cluster on purpose and scores the
+agent against answer keys.
 
-> **Status: all build phases complete.** The agent diagnoses a broken namespace (one-shot or tool-using, with runbook retrieval), proposes one allowlisted action, and a separate executor identity applies it only after a typed human approval, then verifies it worked. Every step lands in a hash-chained audit log. On the lab it fixed 4/4 fixable faults and changed nothing in all 3 that needed a human, with 0 harmful changes. A self-hosted open model (Qwen3-8B on vLLM, on a scale-to-zero EKS GPU node) was compared with Bedrock on the same evals, and Prometheus/Grafana show quality, safety, cost and the audit trail.
+## At a glance
+
+| | Result |
+|---|---|
+| **Fixing safely** | 4/4 fixable faults fixed and verified, 3/3 "needs a human" faults left alone, **0 harmful changes**, even with an approver that says yes to everything |
+| **Safety gate** | Every PR replays the production diagnoser's recorded answers through the current code; one unsafe or invalid answer, on any scenario, fails the build |
+| **Grading the grader** | LLM judge vs human labels: 82% agreement, Cohen's kappa 0.62, **0 false passes** (keyword grading: 36%, kappa −0.22) |
+| **Self-hosted vs Bedrock** | Qwen3-8B on vLLM matched Nova Lite's pass rate, but Bedrock was **4–13× cheaper** per diagnosis and 3–8× faster at this volume; break-even ≈ 500–2,200 diagnoses an hour. The 8B agent made 3 unsafe proposals, enough to fail the safety gate |
+| **GPU on demand** | A pod asking for a GPU was running on a fresh node in **84 s**; the cluster was back to **zero GPU nodes** without anyone touching it |
+
+**Stack:** Python · Amazon Bedrock (Nova Lite, Nova Pro) · vLLM + Qwen3-8B · Kubernetes (kind
+locally, Amazon EKS) · Karpenter · Terraform · GitHub Actions · MLflow · Prometheus, Pushgateway,
+Grafana.
 
 ## How it works
 
+```mermaid
+flowchart LR
+  S["kind lab<br/>7 broken scenarios"] -->|"read-only RBAC,<br/>redacted"| A["Agent<br/>one-shot or tool-using"]
+  R["Runbooks<br/>retrieved and cited"] --> A
+  A <--> M["LLM: Bedrock Nova Lite,<br/>or Qwen3-8B on vLLM<br/>(EKS GPU node, scale to zero)"]
+  A --> C["Contract + guardrails<br/>fail closed to escalate"]
+  C --> H["Human types the<br/>Deployment name"]
+  H --> E["Executor: own identity,<br/>allowlist, dry run,<br/>re-check, verify"]
+  E -->|"rollback / restart"| S
+  E --> L[("Hash-chained<br/>audit log")]
+  C --> V["Evals: answer keys,<br/>LLM judge, CI gate, MLflow"]
+  L --> G["Pushgateway, Prometheus,<br/>Grafana"]
+  V --> G
 ```
-broken namespace ──► evidence bundle ──► LLM diagnosis ──► scored against the answer key
-   (kind lab)        read-only, redacted    one JSON answer      root cause, action, safety
-```
 
-1. **Evidence** (`kubemedic/evidence.py`): runs as a read-only ServiceAccount and collects deployments (with what the current revision changed), pods, events, ConfigMap *key names* and recent logs. Secrets are redacted before anything leaves the cluster.
-2. **Diagnosis** (`kubemedic/diagnose.py`): sends the bundle to a Bedrock model, which must answer in a fixed JSON shape (`kubemedic/contract.py`) with a root cause, quoted evidence and one action: `rollback`, `rollout_restart`, `scale` or `escalate`.
-3. **Evaluation** (`evals/`): runs every scenario several times and grades each answer separately on root cause, action and safety.
+1. **A lab of real failures** (`lab/`, `scenarios/`): seven reproducible faults on a local kind
+   cluster, each with an answer key (root cause, acceptable actions, forbidden actions). Three of
+   them have "change nothing, escalate" as the right answer, so over-eager fixes are measurable.
+2. **Read-only diagnosis** (`kubemedic/`): one-shot (code gathers a redacted evidence bundle) or
+   tool-using (the model chooses what to inspect next through a read-only, schema-checked toolbox).
+   Either way the answer must fit a fixed JSON contract, cite real runbooks, and pass code
+   guardrails that fail closed to "escalate".
+3. **Safe remediation** (`kubemedic/executor.py`, `kubemedic/fix.py`): a separate identity that can
+   only roll back or restart, builds every command itself, dry-runs it, needs a typed human
+   approval bound to the live state, re-checks before acting, verifies the result and audits every
+   step.
+4. **Evaluation** (`evals/`): every scenario several times, graded on root cause (keywords and an
+   LLM judge calibrated against human labels), action and safety; recorded answers replayed as a
+   merge gate; runs tracked in MLflow; fix rate measured end to end.
+5. **Self-hosting and monitoring** (`terraform/`, `deploy/`): an ephemeral EKS cluster where
+   Karpenter adds a GPU node only while the model runs, and a Grafana dashboard fed by a Pushgateway.
 
-## Why start with a lab
-
-LLM agents are non-deterministic, so "it worked when I tried it" isn't evidence. Before writing any agent code, this repo builds a set of reproducible, verified failures with known root causes. That set is the evaluation suite every later phase is scored against.
+**Design choices worth knowing about:**
+- *Build the evaluation first.* LLM output varies run to run, so "it worked when I tried it" isn't
+  evidence. The fault lab and answer keys came before any agent code.
+- *The model only proposes.* Safety comes from what the executor will and won't do, not from the
+  prompt: allowlisted actions, commands built in code, a separate identity, human approval.
+- *Measure the system and the model separately.* Guardrail rescues count towards system accuracy
+  but not model accuracy, so a weaker model can't hide behind the guardrails.
+- *Report what didn't work.* The agent lost to one-shot at first, the self-hosted model was unsafe as
+  an agent, and the first fix-rate number was a measurement bug; all are written up below.
 
 ## Quick start
 
@@ -34,7 +79,7 @@ make break-all && make check-all        # the whole suite
 make cluster-down
 ```
 
-Cost: £0. Everything runs locally.
+Cost: nothing. Everything runs locally.
 
 ### Diagnose with an LLM
 
@@ -82,6 +127,22 @@ Every eval run is logged automatically: model, prompt version, RAG on/off and gi
 pass rate, safety, citations, tokens, latency and estimated cost (metrics); and the full report
 folder (artifacts). Storage is a local SQLite database in `.mlflow/`. Prices come from
 [evals/pricing.yaml](evals/pricing.yaml).
+
+### Self-host a model on EKS (billed: about $0.13/h for the cluster, plus the GPU only while the model runs)
+
+```bash
+TF_VAR_alert_email=you@example.com make tf-bootstrap   # once: state bucket and a $30/month budget alert
+make eks-up             # ephemeral EKS cluster, Karpenter and a one-GPU, scale-to-zero node pool
+make gpu-test           # prove a GPU node appears on demand and goes away afterwards
+make model-up           # vLLM + Qwen3-8B on a GPU node (~4 min once the image is cached)
+make model-forward      # own terminal: the model on http://localhost:8000/v1
+make eval MODEL=openai:Qwen/Qwen3-8B RAG=1               # the same evals, self-hosted
+make compare A=reports/<bedrock run> B=reports/<self-hosted run>   # quality, cost, break-even
+make model-down && make eks-down && make aws-running     # GPU off, cluster gone, nothing left billing
+```
+
+New AWS accounts often start with a GPU quota of 0: request "Running On-Demand G and VT instances" and
+"All G and VT Spot Instance Requests" (8 vCPUs each) first.
 
 ## Scenarios
 
@@ -498,15 +559,20 @@ scenarios/<id>/           base.yaml (optional), break.yaml, expected.yaml (the a
 lab/                      Python CLI: validate, break, check, reset
 deploy/agent/rbac.yaml    the agent's read-only identity
 deploy/executor/rbac.yaml the executor's narrow identity (restart and rollback only)
-kubemedic/                the agent (contract, redaction, evidence, diagnosis, tools), executor, approval flow, audit log
+deploy/gpu/               Karpenter GPU node pool (one GPU, spot first, scale to zero) and a GPU test pod
+deploy/model/             vLLM serving Qwen3-8B (replicas 0 until make model-up)
+deploy/monitoring/        Pushgateway, Prometheus and Grafana with the kubemedic dashboard, for kind
+kubemedic/                the agent (contract, redaction, evidence, diagnosis, tools), model adapters, executor, approval flow, audit log, metrics
 runbooks/                 symptom-first runbooks the agent retrieves and cites
-evals/                    scorers, eval runners, record/replay, merge gate, MLflow tracking, model prices
-evals/recordings/         recorded model answers (one-shot) and conversation tapes (agent) that CI replays on every PR
+evals/                    scorers, LLM judge, eval runners, record/replay, merge gate, fix rate, comparisons, MLflow tracking, prices
+evals/recordings/         recorded model answers (one-shot), conversation tapes (agent) and judge verdicts that CI replays on every PR
+terraform/bootstrap/      once: Terraform state bucket and a monthly budget alert
+terraform/cluster/        ephemeral EKS cluster, VPC (no NAT), Karpenter and the NVIDIA device plugin
 tests/                    unit tests (no cluster or AWS needed)
-.github/workflows/ci.yaml lint + tests, then break, check, RBAC-check and evidence on a live kind cluster
+.github/workflows/ci.yaml lint, tests and Terraform checks; the eval gate; faults, RBAC and evidence on a live kind cluster
 ```
 
-## Roadmap
+## Build phases
 
 | Phase | Scope |
 |---|---|
