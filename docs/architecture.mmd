@@ -1,0 +1,14 @@
+%% Architecture diagram for the README. Re-render after editing: mmdc -i docs/architecture.mmd -o docs/images/architecture.png -b white -s 2
+
+flowchart LR
+  S["kind lab<br/>7 broken scenarios"] -->|"read-only RBAC,<br/>redacted"| A["Agent<br/>one-shot or tool-using"]
+  R["Runbooks<br/>retrieved and cited"] --> A
+  A <--> M["LLM: Bedrock Nova Lite,<br/>or Qwen3-8B on vLLM<br/>(EKS GPU node, scale to zero)"]
+  A --> C["Contract + guardrails<br/>fail closed to escalate"]
+  C --> H["Human types the<br/>Deployment name"]
+  H --> E["Executor: own identity,<br/>allowlist, dry run,<br/>re-check, verify"]
+  E -->|"rollback / restart"| S
+  E --> L[("Hash-chained<br/>audit log")]
+  C --> V["Evals: answer keys,<br/>LLM judge, CI gate, MLflow"]
+  L --> G["Pushgateway, Prometheus,<br/>Grafana"]
+  V --> G
