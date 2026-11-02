@@ -24,6 +24,10 @@ spec:
       labels: {app: vllm}
     spec:
       automountServiceAccountToken: false     # the model server never talks to the Kubernetes API
+      # Kubernetes injects variables for every Service in the namespace, named after it: for a
+      # Service called "vllm" that includes VLLM_PORT=tcp://<ip>:8000. vLLM reads VLLM_PORT as its
+      # own setting and refuses to start ("appears to be a URI"). Service links are off for that.
+      enableServiceLinks: false
       tolerations:
         - key: nvidia.com/gpu
           operator: Exists

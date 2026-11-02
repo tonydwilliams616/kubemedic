@@ -1,9 +1,8 @@
 # Karpenter (which adds a GPU node only while a pod needs one, and removes it when idle) and the NVIDIA device plugin (which tells Kubernetes the node has a GPU).
 
-# Same pattern as the clinical-trial project's 30-platform stack, trimmed: one controller replica
-# (a lab has one system node) and no Argo CD. The GPU NodePool itself is plain YAML in
-# deploy/gpu/, applied by `make eks-up`, because Terraform can't plan a resource whose CRD is
-# installed in the same apply.
+# Trimmed for a lab: one controller replica (a lab has one system node). The GPU NodePool itself
+# is plain YAML in deploy/gpu/, applied by `make eks-up`, because Terraform can't plan a resource
+# whose CRD is installed in the same apply.
 
 # ---- AWS side: controller role (Pod Identity), node role + access entry, spot interruption queue ----
 module "karpenter" {
