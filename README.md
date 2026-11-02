@@ -2,7 +2,7 @@
 
 An AI agent that diagnoses Kubernetes failures, retrieves the relevant runbook, and proposes a fix from a small allowlist of actions. A human approves every change, and every step is audited.
 
-> **Status: Phase 5 complete, safe remediation.** The agent diagnoses a broken namespace (one-shot or tool-using, with runbook retrieval), proposes one allowlisted action, and a separate executor identity applies it only after a typed human approval, then verifies it worked. Every step lands in a hash-chained audit log. On the lab it fixed 4/4 fixable faults and changed nothing in all 3 that needed a human, with 0 harmful changes.
+> **Status: all build phases complete.** The agent diagnoses a broken namespace (one-shot or tool-using, with runbook retrieval), proposes one allowlisted action, and a separate executor identity applies it only after a typed human approval, then verifies it worked. Every step lands in a hash-chained audit log. On the lab it fixed 4/4 fixable faults and changed nothing in all 3 that needed a human, with 0 harmful changes. A self-hosted open model (Qwen3-8B on vLLM, on a scale-to-zero EKS GPU node) was compared with Bedrock on the same evals, and Prometheus/Grafana show quality, safety, cost and the audit trail.
 
 ## How it works
 
@@ -46,7 +46,7 @@ make break-all && make check-all
 make evidence SCENARIO=oom-killed                 # exactly what the model will see
 make diagnose SCENARIO=oom-killed                 # one diagnosis, with tokens and latency
 make eval                                         # every scenario x 3, scored; results in reports/
-make eval MODEL=us.anthropic.claude-sonnet-5-5    # any Bedrock model ID
+make eval MODEL=us.amazon.nova-pro-v1:0          # any Bedrock model ID
 make eval RAG=1                                   # with retrieved runbooks and citations (prompt v3)
 make eval-retrieval                               # score runbook search alone, no LLM
 ```
@@ -99,9 +99,62 @@ See [scenarios/README.md](scenarios/README.md) for the format and [ADR 0001](doc
 
 ## Results
 
-Amazon Nova Lite (`us.amazon.nova-lite-v1:0`), 6 scenarios × 3 repeats, temperature 0.
+### Self-hosted open model vs Bedrock (Phase 6, 2 November)
 
-### Latest: RAG and guardrails (same cluster, same day)
+The same evals, same day, same prompts, temperature 0, 7 scenarios × 3 repeats, keyword-graded
+root causes: Amazon Nova Lite on Bedrock against **Qwen3-8B** (Apache 2.0) served by **vLLM** on
+one EKS GPU node that Karpenter adds on demand and removes when idle.
+
+| | Nova Lite one-shot | Qwen3-8B one-shot | Nova Lite agent | Qwen3-8B agent |
+|---|---|---|---|---|
+| Pass rate | 71% | 71% | 52% | 52% |
+| Root cause | 71% | 71% | 52% | 67% |
+| Action, model alone (no guardrail rescues) | 86% | 71% | 100% | 71% |
+| **Unsafe proposals** | 0 | 0 | 0 | **3** |
+| Mean latency | 2.8 s | 22.2 s | 8.8 s | 27.2 s |
+| Cost per diagnosis | $0.00037 | $0.0050 | $0.0016 | $0.0061 |
+
+- **Quality ties, judgement doesn't.** Pass rates match, but Qwen picked the wrong action more
+  often. One-shot, the guardrails overrode 6 of its 21 proposals to escalate. As an agent it
+  proposed `rollout_restart` 3 times on the frontier scenario: forbidden by the answer key and not
+  caught by any guardrail, because a restart looks harmless to them. The eval gate (0 unsafe) would
+  block this model; in `make fix`, the typed human approval would be the last line of defence.
+- **Renting wins at this volume.** Self-hosted cost is GPU time (g6.xlarge on-demand, $0.8048/h)
+  divided by diagnoses. The GPU matches Bedrock's per-token price at **2,164 diagnoses an hour**
+  one-shot and **499 an hour** for the agent (long conversations make per-token pricing dearer).
+  One request at a time it managed ~162 and ~133 an hour; vLLM batches concurrent requests, so real
+  capacity is higher, but that was not measured.
+- **The 8B model needed JSON mode.** On its first live test Qwen3-8B wrote a correct diagnosis as
+  invalid JSON (key-value pairs inside a list), twice. One-shot replies from self-hosted models
+  therefore use vLLM's JSON mode (constrained decoding), which fixes syntax only: fields, actions and
+  citations are still checked by the same contract as Nova's. With it, 0 of 21 one-shot answers were
+  invalid (agent answers arrive as tool calls, already constrained). Nova Lite didn't need it.
+- **Grading caveat.** Both models score low on `oom-killed` root cause (Nova 1/3, Qwen 0/3) while
+  choosing the right action 3/3, which points at the keyword grader's wording rather than the models;
+  it affects both equally.
+
+**GPU on demand (`make gpu-test`):** a pod asking for a GPU got a node and ran `nvidia-smi` on an
+NVIDIA A10G **84 s** after the request; the idle node was gone again **483 s** after the request
+(consolidation, drain and EC2 termination). Starting the model took **232 s** on a GPU node that
+already had the 9 GB vLLM image (pulling it adds ~2.5 min); that includes downloading 16 GB of weights. Spot GPU capacity was unavailable in all three zones that
+evening (`InsufficientInstanceCapacity`), so Karpenter fell back to on-demand as the NodePool allows.
+
+**What broke on the way, and the fixes:**
+- *vLLM wouldn't start:* Kubernetes injects variables for every Service in the namespace, and a
+  Service named `vllm` produced `VLLM_PORT=tcp://<ip>:8000`, which vLLM read as its own setting.
+  Fixed with `enableServiceLinks: false`.
+- *Terraform couldn't plan:* a module-wide `depends_on` (added to order nodes after the internet
+  route) defers every data source in the EKS module to apply time ("Invalid count argument"). Fixed
+  by referring to the route in the system node group's subnet list instead, which orders just those
+  resources; the internet gateway then took 1 s to delete instead of retrying for minutes.
+- *Teardown hung twice:* Karpenter's EC2NodeClass finalizer blocked its CRD uninstall once Karpenter
+  was gone, and a network interface left by the VPC CNI blocked the security group. `make eks-down`
+  now deletes the EC2NodeClass while Karpenter is still running, and removes leftover `aws-K8S-*`
+  interfaces before retrying.
+
+### RAG and guardrails (Phase 2, same cluster, same day)
+
+Amazon Nova Lite (`us.amazon.nova-lite-v1:0`), 6 scenarios × 3 repeats, temperature 0.
 
 | Run | Pass | Root cause | Action | Unsafe | Citations | Tokens / diagnosis | Cost / diagnosis |
 |---|---|---|---|---|---|---|---|
@@ -463,5 +516,5 @@ tests/                    unit tests (no cluster or AWS needed)
 | 3 | Experiment tracking with MLflow; evals as a CI gate (recorded model answers replayed on every PR) ✅ |
 | 4 | Tool-using agent: the model chooses what to inspect next, step by step, instead of one fixed bundle ✅ |
 | 5 | Allowlisted remediation executor with its own identity, human approval, verification, an audit log and a fix-rate eval ✅ |
-| 6 | Self-hosted open model on EKS: Karpenter GPU nodes, vLLM serving, scale to zero; accuracy, latency and cost per diagnosis compared with Bedrock ← *next* |
-| 7 | Production metrics: tokens, cost, latency and success rate in Prometheus/Grafana |
+| 6 | Self-hosted open model on EKS: Karpenter GPU nodes, vLLM serving, scale to zero; accuracy, latency and cost per diagnosis compared with Bedrock ✅ |
+| 7 | Production metrics: quality, safety, cost, latency and the audit trail in Prometheus/Grafana ✅ |

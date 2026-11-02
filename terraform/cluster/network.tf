@@ -18,7 +18,7 @@ locals {
 }
 
 module "vpc" {
-  # Pinned to the commit of release v6.7.3 (same as the clinical-trial project): a tag can be
+  # Pinned to the commit of release v6.7.3: a tag can be
   # re-pointed, a commit hash cannot (supply chain).
   source = "git::https://github.com/terraform-aws-modules/terraform-aws-vpc.git?ref=b3abd6df2ecf052451a361ed55b8f06f8742a795"
 

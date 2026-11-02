@@ -15,8 +15,18 @@ data "aws_iam_session_context" "current" {
   arn = data.aws_caller_identity.current.arn
 }
 
+# Order matters both ways, for the system nodes. Up: the internet route must exist before they
+# start, or they can't reach the internet to join the cluster. Down: they (and their public IPs)
+# must be gone before the internet gateway can be detached, or the gateway sits retrying.
+# Referring to the route here makes Terraform order just these resources. A module-wide
+# depends_on would do it too, but it also defers every data source inside the EKS module to
+# apply time, which breaks planning ("Invalid count argument").
+locals {
+  node_subnet_ids = [for id in module.vpc.public_subnets : id if module.vpc.public_internet_gateway_route_id != null]
+}
+
 module "eks" {
-  # Pinned to the commit of release v21.26.0 (same as the clinical-trial project)
+  # Pinned to the commit of release v21.26.0: a tag can be re-pointed, a commit hash cannot
   source = "git::https://github.com/terraform-aws-modules/terraform-aws-eks.git?ref=323c633629b8e4306d94eb1392d7400a80143621"
 
   name               = var.cluster_name
@@ -78,6 +88,8 @@ module "eks" {
       ami_type       = "AL2023_x86_64_STANDARD"
       instance_types = var.system_node_instance_types
       capacity_type  = "SPOT" # ~70% cheaper; fine for a session-only cluster
+      # Only once the internet route exists (see the locals above)
+      subnet_ids = local.node_subnet_ids
 
       # One node is enough for CoreDNS and the Karpenter controller in a lab
       min_size     = 1
@@ -94,10 +106,4 @@ module "eks" {
   node_security_group_tags = {
     "karpenter.sh/discovery" = var.cluster_name
   }
-
-  # Order matters both ways. Up: the internet gateway route must exist before nodes start, or
-  # they can't reach the internet to join the cluster. Down: nodes (and their public IPs) must be
-  # gone before the internet gateway can be detached; without this Terraform deletes both at once
-  # and the gateway sits retrying until the node group has finished deleting.
-  depends_on = [module.vpc]
 }

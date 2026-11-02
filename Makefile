@@ -189,8 +189,22 @@ eks-down: ## Remove GPU nodes, then destroy the cluster and its VPC (stops the h
 		[ "$$n" = "0" ] && exit 0; echo "waiting for $$n Karpenter node(s) to terminate..."; sleep 10; \
 	done; \
 	echo "Karpenter nodes are still running: NOT destroying the cluster (they'd be orphaned). Check: kubectl --context $(EKS_CONTEXT) get nodeclaims"; exit 1
-	$(TF) -chdir=terraform/cluster destroy && \
-	(kubectl config delete-context $(EKS_CONTEXT) >/dev/null 2>&1; true)
+	@# The EC2NodeClass has a finalizer only the Karpenter controller can remove. Delete it now,
+	@# while Karpenter is still running: once Terraform uninstalls Karpenter, it would block the
+	@# CRD uninstall forever ("context deadline exceeded").
+	-kubectl --context $(EKS_CONTEXT) delete ec2nodeclass --all --ignore-not-found --timeout=3m
+	@# A node terminated mid-teardown can leave a VPC CNI network interface (aws-K8S-<instance>)
+	@# behind, which blocks the security group and subnet. If the destroy fails, remove those and
+	@# try once more.
+	$(TF) -chdir=terraform/cluster destroy || { \
+		echo "Destroy failed: removing network interfaces the VPC CNI left behind, then retrying once"; \
+		for eni in $$(aws ec2 describe-network-interfaces --region $(EKS_REGION) \
+			--filters Name=status,Values=available Name=description,Values='aws-K8S-*' \
+			--query 'NetworkInterfaces[].NetworkInterfaceId' --output text); do \
+			echo "deleting $$eni"; aws ec2 delete-network-interface --region $(EKS_REGION) --network-interface-id $$eni; \
+		done; \
+		$(TF) -chdir=terraform/cluster destroy; }
+	-kubectl config delete-context $(EKS_CONTEXT) >/dev/null 2>&1
 	@$(MAKE) --no-print-directory aws-running
 
 gpu-test: ## Prove scale-from-zero and back: a pod asks for a GPU, Karpenter adds a node, nvidia-smi runs, the node goes (BILLED: ~10 min of spot GPU)

@@ -16,6 +16,13 @@ library is used, so no new dependency.
 
 Settings match the Bedrock path where the API allows: temperature 0, the same output-token caps,
 tool_choice "required" (= Converse toolChoice "any") and a named tool for the forced last step.
+
+One deliberate difference: one-shot replies use JSON mode (constrained decoding), so the server
+only lets the model produce syntactically valid JSON. Without it, Qwen3-8B returned answers that
+were right but not JSON (key-value pairs inside a list) on its first live test. JSON mode fixes
+the syntax only: whether the answer has the right fields, a real action and real citations is
+still the model's job, checked by the same contract as Bedrock's answers. Agent tool calls are
+already constrained by tool_choice.
 """
 from __future__ import annotations
 
@@ -149,7 +156,9 @@ class OpenAICompatModel:
                                    "is the port-forward running?") from e
 
     def converse(self, system: str, messages: list[dict]) -> tuple[str, dict]:
-        resp = self._post({"messages": to_openai_messages(system, messages), "max_tokens": MAX_OUTPUT_TOKENS})
+        # Every caller of converse (the one-shot diagnoser) expects one JSON object back
+        resp = self._post({"messages": to_openai_messages(system, messages), "max_tokens": MAX_OUTPUT_TOKENS,
+                           "response_format": {"type": "json_object"}})
         return strip_thinking(resp["choices"][0]["message"].get("content")), _usage(resp)
 
     def converse_tools(self, system: str, messages: list[dict], tools: list[dict],

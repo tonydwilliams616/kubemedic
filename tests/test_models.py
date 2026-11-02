@@ -133,6 +133,7 @@ def test_converse_sends_the_same_settings_as_bedrock():
         body = req["body"]
         assert body["model"] == "m" and body["temperature"] == 0 and body["max_tokens"] == 1000
         assert body["chat_template_kwargs"] == {"enable_thinking": False} and "tools" not in body
+        assert body["response_format"] == {"type": "json_object"}       # syntax guaranteed; content still checked
 
 
 def test_tool_choice_required_or_one_named_tool():
