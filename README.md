@@ -22,20 +22,9 @@ Grafana.
 
 ## How it works
 
-```mermaid
-flowchart LR
-  S["kind lab<br/>7 broken scenarios"] -->|"read-only RBAC,<br/>redacted"| A["Agent<br/>one-shot or tool-using"]
-  R["Runbooks<br/>retrieved and cited"] --> A
-  A <--> M["LLM: Bedrock Nova Lite,<br/>or Qwen3-8B on vLLM<br/>(EKS GPU node, scale to zero)"]
-  A --> C["Contract + guardrails<br/>fail closed to escalate"]
-  C --> H["Human types the<br/>Deployment name"]
-  H --> E["Executor: own identity,<br/>allowlist, dry run,<br/>re-check, verify"]
-  E -->|"rollback / restart"| S
-  E --> L[("Hash-chained<br/>audit log")]
-  C --> V["Evals: answer keys,<br/>LLM judge, CI gate, MLflow"]
-  L --> G["Pushgateway, Prometheus,<br/>Grafana"]
-  V --> G
-```
+![How kubemedic works: lab, read-only agent, LLM, guardrails, human approval, executor, audit log, evals and monitoring](docs/images/architecture.png)
+
+<sub>Diagram source: [docs/architecture.mmd](docs/architecture.mmd).</sub>
 
 1. **A lab of real failures** (`lab/`, `scenarios/`): seven reproducible faults on a local kind
    cluster, each with an answer key (root cause, acceptable actions, forbidden actions). Three of
